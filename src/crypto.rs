@@ -8,7 +8,7 @@ pub fn generate_keypair() -> Result<(Vec<u8>, Vec<u8>), AppError> {
     
     // Generate random 32-byte private key
     let mut private_key = [0u8; 32];
-    rng.try_fill_bytes(&mut private_key);
+    let _ = rng.try_fill_bytes(&mut private_key);
     
     let secret_key = SecretKey::from_slice(&private_key)
         .map_err(|e| AppError::KeyGenerationError(e.to_string()))?;

@@ -1,12 +1,12 @@
 use crate::error::AppError;
 use dashmap::DashMap;
 
-pub struct KeyStorage {
+pub struct KeyStore {
     public_keys: DashMap<u32, Vec<u8>>,
     private_keys: DashMap<u32, Vec<u8>>,
 }
 
-impl KeyStorage {
+impl KeyStore {
     pub fn new() -> Self {
         Self {
             public_keys: DashMap::new(),
