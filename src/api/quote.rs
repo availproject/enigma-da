@@ -1,3 +1,4 @@
+use crate::types::QuoteResponse;
 use axum::{
     response::IntoResponse,
     Json, 
@@ -15,5 +16,7 @@ pub async fn quote() -> impl IntoResponse {
         "Successfully generated quote"
     );
     
-    Json(random_bytes)
+    Json(QuoteResponse{
+        signed_quote: random_bytes
+    })
 }

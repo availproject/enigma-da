@@ -26,7 +26,7 @@ async fn main() {
     let key_store = Arc::new(KeyStore::new());
     tracing::info!("Key store initialized");
 
-    // Build our application with a route
+    // Application routes
     let app = Router::new()
         .route("/v1/register", post(register))
         .route("/v1/encrypt", post(encrypt))
@@ -39,6 +39,6 @@ async fn main() {
         .await
         .unwrap();
     
-    tracing::info!(address = %addr, "Server listening");
+    tracing::info!(address = %addr, "Encryption server listening");
     axum::serve(listener, app).await.unwrap();
 }
