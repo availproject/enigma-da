@@ -1,4 +1,3 @@
-use crate::crypto::generate_keypair;
 use crate::error::AppError;
 use crate::key_store::KeyStore;
 use crate::types::{RegisterRequest, RegisterResponse};
@@ -17,15 +16,15 @@ pub async fn register(
     let _guard = request_span.enter();
 
     tracing::debug!("Generating new keypair");
-    let (public_key, private_key) = generate_keypair()?;
+    let (private_key, public_key) = ecies::utils::generate_keypair();
     
     tracing::debug!("Generated keypair successfully");
     
-    key_store.store_keys(request.app_id, &public_key, &private_key).await?;
+    key_store.store_keys(request.app_id, &public_key.serialize(), &private_key.serialize()).await?;
     tracing::info!(app_id = request.app_id, "Successfully registered new app");
     
     Ok(Json(RegisterResponse {
         app_id: request.app_id,
-        public_key,
+        public_key: public_key.serialize().to_vec(),
     }))
 }

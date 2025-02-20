@@ -6,7 +6,6 @@ use std::sync::Arc;
 use tower_http::trace::TraceLayer;
 
 pub mod api;
-pub mod crypto;
 pub mod error;
 pub mod key_store;
 pub mod tracer;
