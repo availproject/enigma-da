@@ -1,0 +1,2 @@
+EnclaveCID=123
+EnclavePort=5005
