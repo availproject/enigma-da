@@ -1,0 +1,10 @@
+[package]
+name = "vssspy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+elliptic-curve = { version = "0.13", features = ["ecdh"] }
+k256 = { version = "0.13", features = ["arithmetic", "bits"] }
+vsss-rs = "4.0"
+pyo3 = { version = "0.17", features = ["extension-module"] }

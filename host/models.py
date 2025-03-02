@@ -6,8 +6,10 @@ class RegisterRequest(BaseModel):
     Request body model for registering an application.
     
     Attributes:
+        app_id (int): A unique application id
         public_key (List[int]): The public key to be registered as raw bytes.
     """
+    app_id: int
     public_key: List[int]
 
 class RegisterResponse(BaseModel):
@@ -39,3 +41,14 @@ class EncryptionResponse(BaseModel):
         encrypted_data (List[int]): Combined raw bytes of ephemeral public key and ciphertext
     """
     encrypted_data: List[int]
+
+class DecryptionRequest(BaseModel):
+    """
+    """
+    app_id: int
+    encrypted_data: List[int]
+
+class DecryptionResponse(BaseModel):
+    """
+    """
+    plaintext: List[int]

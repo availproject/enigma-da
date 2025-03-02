@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from host.models import RegisterRequest, RegisterResponse, EncryptionRequest, EncryptionResponse
+from host.models import RegisterRequest, RegisterResponse, EncryptionRequest, EncryptionResponse, DecryptionRequest, DecryptionResponse
 from host.db import register_app, get_public_key
 from host.vsock import VsockStream
 from logger import logger
@@ -16,13 +16,13 @@ async def home():
 @router.post("/register", response_model=RegisterResponse)
 async def register(request: RegisterRequest):
     """
-    Registers a new application by receiving a public key and assigning a unique app_id.
+    Registers a new application by receiving a public key and a unique app_id.
     
     Args:
         request (RegisterRequest): The registration request containing the public key.
 
     Returns:
-        RegisterResponse: A response containing app_id.
+        RegisterResponse: A response containing app_id if registration was successfull.
     """
     app_id = register_app(request)
 
@@ -61,6 +61,27 @@ async def encrypt(request: EncryptionRequest):
 
     return EncryptionResponse(
         encrypted_data=encrypted_data_bytes
+    )
+
+@router.post("/decrypt", response_model=DecryptionResponse)
+async def decrypt(request: DecryptionRequest):
+    """
+    """
+    app_public_key = get_public_key(request.app_id)
+    if app_public_key is None:
+        raise HTTPException(status_code=404, detail="App not found!")
+
+    enclave_client = VsockStream()
+    endpoint = (config.EnclaveCID, config.EnclavePort)
+    enclave_client.connect(endpoint)
+
+    decrypted_data = enclave_client.execute("decrypt", {
+        "encrypted_data": request.encrypted_data
+    })
+    plaintext = list(bytes.fromhex(decrypted_data))
+
+    return DecryptionResponse(
+        plaintext=plaintext
     )
 
 

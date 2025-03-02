@@ -1,2 +1,2 @@
-EnclaveCID=123
+EnclaveCID=24
 EnclavePort=5005

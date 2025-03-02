@@ -1,4 +1,4 @@
-from handlers import encrypt_data
+from handlers import encrypt_data, decrypt_data
 import json
 import socket 
 
@@ -32,6 +32,11 @@ class VsockListener:
                         plaintext = data.get('plaintext')
                         encrypted_data = encrypt_data(public_key, plaintext)
                         client.send(str(encrypted_data).encode())
+                    elif request.get('type') == 'decrypt':
+                        data = request.get('data')
+                        encrypted_data = data.get('encrypted_data')
+                        decrypted_data = decrypt_data(encrypted_data)
+                        client.send(str(decrypted_data).encode())
     
                 client.close()
             except Exception as ex:
