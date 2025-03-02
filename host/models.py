@@ -36,6 +36,8 @@ class EncryptionResponse(BaseModel):
     Response body model after attempting data encryption.
 
     Attributes:
-        encrypted_data (List[int]): Combined raw bytes of ephemeral public key and ciphertext
+        encryptedMessage (str): Base64-encoded encrypted message
+        attestationDoc (str): Base64-encoded attestation document
     """
-    encrypted_data: List[int]
+    encryptedMessage: str
+    attestationDoc: str

@@ -1,0 +1,9 @@
+pycryptodome==3.9.9
+ecdsa==0.18.0
+web3==6.0.0
+urllib3<2.0.0
+boto3==1.26.89
+cryptography==41.0.1
+eciespy==0.3.13
+aws_nsm_interface_verifiably==1.0.1
+cbor2==5.2.0
