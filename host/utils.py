@@ -3,6 +3,9 @@ import boto3
 import json
 import base64
 import datetime
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+import os
+            
 
 def get_iam_token():
     """
@@ -112,7 +115,7 @@ def get_fallback_credentials():
     print("Using fallback credentials")
     return credential
 
-def get_ephemeral_credentials_with_datakey(pcr_values, plaintext_data, kms_key_id):
+def get_ephemeral_credentials_with_datakey(plaintext_data, kms_key_id):
     """
     Encrypt data with a data key for secure processing in an enclave.
     """
@@ -147,9 +150,6 @@ def get_ephemeral_credentials_with_datakey(pcr_values, plaintext_data, kms_key_i
             self.key = base64.b64decode(key) if isinstance(key, str) else key
             
         def encrypt(self, raw):
-            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-            import os
-            
             # Generate a random nonce
             nonce = os.urandom(12)
             
