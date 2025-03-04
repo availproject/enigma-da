@@ -17,11 +17,6 @@ import hashlib
 
 router = APIRouter()
 
-# Add a new model for the attestation verification request
-class AttestationVerificationRequest(BaseModel):
-    encryptedMessage: str
-    attestationDoc: str
-
 @router.get("/")
 async def home():
     return "Welcome to Encifher!"
@@ -88,7 +83,7 @@ async def encrypt(request: EncryptionRequest):
         enclave_client.connect(endpoint)
         
         # Send the payload and get the response
-        response_str = enclave_client.execute("processEncryptedMessage", payload)
+        response_str = enclave_client.execute("encrypt_with_datakey", payload)
         
         # Parse the response
         response = json.loads(response_str)
@@ -110,6 +105,11 @@ async def encrypt(request: EncryptionRequest):
                     content={"error": error_message}
                 )
         
+        # Convert camelCase to snake_case in the response
+        if "encryptedMessage" in response and "attestationDoc" in response:
+            response["encrypted_message"] = response.pop("encryptedMessage")
+            response["attestation_doc"] = response.pop("attestationDoc")
+        
         # If successful, return the response as is
         return response
         
@@ -121,25 +121,24 @@ async def encrypt(request: EncryptionRequest):
         )
 
 @router.post("/verify-attestation")
-async def verify_attestation(request: AttestationVerificationRequest):
+async def verify_attestation(request_data: dict):
     """
     Verify an attestation document from a Nitro Enclave
     
     Args:
-        request: JSON containing the attestation data
+        request_data: JSON containing the attestation data
         
     Returns:
         Dict: Verification results
     """
     try:
-        # Extract the required fields
-        encrypted_message = request.encryptedMessage
-        attestation_doc = request.attestationDoc
+        # Extract the attestation document (handle both camelCase and snake_case)
+        attestation_doc = request_data.get("attestation_doc") or request_data.get("attestationDoc")
         
-        if not encrypted_message or not attestation_doc:
+        if not attestation_doc:
             return JSONResponse(
                 status_code=400,
-                content={"verification_status": "error", "error": "Missing required fields"}
+                content={"verification_status": "error", "error": "Missing attestation document"}
             )
         
         # Extract expected PCR values from the key policy
@@ -150,11 +149,6 @@ async def verify_attestation(request: AttestationVerificationRequest):
             attestation_doc,
             expected_pcrs
         )
-        
-        # Add the encrypted message hash to the response
-        verification_result['encrypted_message_hash'] = hashlib.sha256(
-            encrypted_message.encode()
-        ).hexdigest()
         
         return verification_result
     
@@ -170,7 +164,7 @@ async def decrypt(request: DecryptionRequest):
     Decrypts data that was previously encrypted by the enclave.
     
     Args:
-        request (DecryptionRequest): Contains encryptedMessage and app_id
+        request (DecryptionRequest): Contains encrypted_message and app_id
         
     Returns:
         DecryptionResponse: Response containing decrypted plaintext and attestation document
@@ -187,7 +181,7 @@ async def decrypt(request: DecryptionRequest):
 
         # Use the data key pattern to encrypt the request data
         message_to_encrypt = json.dumps({
-            'encrypted_data': request.encryptedMessage,
+            'encrypted_data': request.encrypted_message,
         })
         
         # Encrypt the request with a data key
@@ -224,25 +218,24 @@ async def decrypt(request: DecryptionRequest):
         # Verify the attestation document if present
         if attestation_doc:
             # Calculate hash of the original encrypted message for verification
-            if isinstance(request.encryptedMessage, str):
+            if isinstance(request.encrypted_message, str):
                 try:
                     # Try to decode from base64
-                    encrypted_bytes = base64.b64decode(request.encryptedMessage)
+                    encrypted_bytes = base64.b64decode(request.encrypted_message)
                 except:
                     # If not base64, encode as UTF-8
-                    encrypted_bytes = request.encryptedMessage.encode('utf-8')
+                    encrypted_bytes = request.encrypted_message.encode('utf-8')
             else:
-                encrypted_bytes = bytes(request.encryptedMessage)
+                encrypted_bytes = bytes(request.encrypted_message)
                 
             message_hash = hashlib.sha256(encrypted_bytes).hexdigest()
-            
         
         # Convert the decrypted data to a list of integers for the response
         plaintext = list(decrypted_data)
         
         return DecryptionResponse(
             plaintext=plaintext,
-            attestationDoc=attestation_doc
+            attestation_doc=attestation_doc
         )
         
     except Exception as e:

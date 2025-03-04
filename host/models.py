@@ -38,11 +38,16 @@ class EncryptionResponse(BaseModel):
     Response body model after attempting data encryption.
 
     Attributes:
-        encryptedMessage (str): Base64-encoded encrypted message
-        attestationDoc (str): Base64-encoded attestation document
+        encrypted_message (str): Base64-encoded encrypted message
+        attestation_doc (str): Base64-encoded attestation document
     """
-    encryptedMessage: str
-    attestationDoc: str
+    encrypted_message: str
+    attestation_doc: str
+    
+    class Config:
+        # For backward compatibility
+        allow_population_by_field_name = True
+        alias_generator = lambda field_name: ''.join(word.capitalize() if i else word for i, word in enumerate(field_name.split('_')))
 
 class DecryptionRequest(BaseModel):
     """
@@ -50,10 +55,10 @@ class DecryptionRequest(BaseModel):
     
     Attributes:
         app_id (int): Application id for fetching public key
-        encryptedMessage (str): Base64-encoded encrypted message
+        encrypted_message (str): Base64-encoded encrypted message
     """
     app_id: int
-    encryptedMessage: str
+    encrypted_message: str
 
 class DecryptionResponse(BaseModel):
     """
@@ -61,7 +66,18 @@ class DecryptionResponse(BaseModel):
     
     Attributes:
         plaintext (List[int]): Decrypted plaintext as raw bytes
-        attestationDoc (Optional[str]): Base64-encoded attestation document
+        attestation_doc (Optional[str]): Base64-encoded attestation document
     """
     plaintext: List[int]
-    attestationDoc: Optional[str] = None
+    attestation_doc: Optional[str] = None
+
+class AttestationVerificationRequest(BaseModel):
+    """
+    Request body model for attestation verification.
+    
+    Attributes:
+        encrypted_message (Optional[str]): Base64-encoded encrypted message
+        attestation_doc (str): Base64-encoded attestation document
+    """
+    encrypted_message: Optional[str] = None
+    attestation_doc: str

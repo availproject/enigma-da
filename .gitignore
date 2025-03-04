@@ -26,3 +26,6 @@ __pycache__/
 app_data/
 *.eif
 attestation_data
+enclave-demo1.json
+key_policy.json
+root.pem

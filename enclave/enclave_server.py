@@ -76,8 +76,8 @@ class NitroServer:
                 )
                 
                 return {
-                    'encryptedMessage': encrypted_message_b64,
-                    'attestationDoc': attestation_doc_b64,
+                    'encrypted_message': encrypted_message_b64,
+                    'attestation_doc': attestation_doc_b64,
                 }
             except Exception as e:
                 error_msg = f"Error encrypting message: {e}"
@@ -162,8 +162,8 @@ class NitroServer:
                 )
                 
                 return {
-                    'encryptedMessage': encrypted_message_b64,
-                    'attestationDoc': attestation_doc_b64,
+                    'encrypted_message': encrypted_message_b64,
+                    'attestation_doc': attestation_doc_b64,
                 }
             except Exception as e:
                 error_msg = f"Error encrypting message: {e}"
