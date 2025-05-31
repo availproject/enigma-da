@@ -5,6 +5,7 @@ use alloy_primitives::{Address, Signature};
 #[derive(Debug, Deserialize)]
 pub struct EncryptRequest {
     pub app_id: u32,
+    #[serde(with = "serde_bytes")]
     pub plaintext: Vec<u8>,
 }
 
@@ -30,4 +31,16 @@ pub struct RegisterRequest {
 pub struct RegisterResponse {
     pub app_id: u32,
     pub public_key: Vec<u8>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DecryptRequest {
+    pub app_id: u32,
+    pub ciphertext: Vec<u8>,
+    pub ephemeral_pub_key: Vec<u8>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DecryptResponse {
+    pub plaintext: Vec<u8>,
 }

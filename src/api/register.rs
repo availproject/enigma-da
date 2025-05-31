@@ -20,7 +20,7 @@ pub async fn register(
     
     tracing::debug!("Generated keypair successfully");
     
-    key_store.store_keys(request.app_id, &public_key.serialize(), &private_key.serialize()).await?;
+    let _ = key_store.store_keys(request.app_id, &public_key.serialize(), &private_key.serialize());
     tracing::info!(app_id = request.app_id, "Successfully registered new app");
     
     Ok(Json(RegisterResponse {

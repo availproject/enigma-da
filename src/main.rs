@@ -11,7 +11,7 @@ pub mod key_store;
 pub mod tracer;
 pub mod types;
 
-use api::{encrypt, quote, register};
+use api::{encrypt, quote, register, decrypt};
 use key_store::KeyStore;
 use tracer::{init_tracer, TracingConfig};
 
@@ -22,13 +22,14 @@ async fn main() {
     tracing::info!("Starting encryption server...");
 
     // Initialize key store
-    let key_store = Arc::new(KeyStore::new());
+    let key_store = Arc::new(KeyStore::new("keystore_db").unwrap());
     tracing::info!("Key store initialized");
 
     // Application routes
     let app = Router::new()
         .route("/v1/register", post(register))
         .route("/v1/encrypt", post(encrypt))
+        .route("/v1/decrypt", post(decrypt))
         .route("/v1/quote", get(quote))
         .layer(TraceLayer::new_for_http())
         .with_state(key_store);
