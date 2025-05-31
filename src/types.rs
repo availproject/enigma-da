@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use dstack_sdk::dstack_client::GetQuoteResponse;
+use alloy_primitives::{Address, Signature};
 
 #[derive(Debug, Deserialize)]
 pub struct EncryptRequest {
@@ -9,13 +11,14 @@ pub struct EncryptRequest {
 #[derive(Debug, Serialize)]
 pub struct EncryptResponse {
     pub ciphertext: Vec<u8>,
-    pub signature: String,
+    pub signature: Signature,
+    pub address: Address,
     pub ephemeral_pub_key: Vec<u8>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Serialize)]
 pub struct QuoteResponse {
-    pub signed_quote: Vec<u8>,
+    pub quote: GetQuoteResponse,
 }
 
 #[derive(Debug, Deserialize)]
