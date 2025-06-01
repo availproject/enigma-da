@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  encifher-service:
+    image: creator5923/encifher-encryption-service:latest
+    container_name: encifher-encryption-service
+    ports:
+      - "3000:3000"
+    environment:
+      RUST_LOG: info
+    volumes:
+      - /var/run/dstack.sock:/var/run/dstack.sock
+    command: ["/app/start.sh"]
