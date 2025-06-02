@@ -20,6 +20,10 @@ pub enum AppError {
     KeyNotFound(u32),
     #[error("Database error: {0}")]
     Database(String),
+    #[error("Quote retrieval failed: {0}")]
+    QuoteGenerationFailed(String),
+    #[error("Decryption failed invalid input: {0}")]
+    InvalidInput(String),
 }
 
 #[derive(Serialize)]
@@ -36,6 +40,8 @@ impl IntoResponse for AppError {
             AppError::KeyGenerationError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             AppError::KeyNotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
             AppError::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            AppError::QuoteGenerationFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            AppError::InvalidInput(_) => (StatusCode::BAD_REQUEST, self.to_string()),
         };
 
         (status, Json(ErrorResponse { error: message })).into_response()
