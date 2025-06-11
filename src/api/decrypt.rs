@@ -17,7 +17,10 @@ pub async fn decrypt(
 
     // Input validation
     if request.ciphertext.is_empty() || request.ephemeral_pub_key.is_empty() {
-        tracing::warn!(app_id = request.app_id, "Empty ciphertext or ephemeral public key");
+        tracing::warn!(
+            app_id = request.app_id,
+            "Empty ciphertext or ephemeral public key"
+        );
         return Err(AppError::InvalidInput(
             "Ciphertext and ephemeral public key must not be empty".into(),
         ));
@@ -41,7 +44,10 @@ pub async fn decrypt(
     let mut full_ciphertext = request.ephemeral_pub_key.clone();
     full_ciphertext.extend_from_slice(&request.ciphertext);
 
-    tracing::debug!("Attempting to decrypt ciphertext for app_id {}", request.app_id);
+    tracing::debug!(
+        "Attempting to decrypt ciphertext for app_id {}",
+        request.app_id
+    );
     let plaintext = ecies::decrypt(&private_key, &full_ciphertext).map_err(|e| {
         tracing::error!(error = ?e, "Decryption failed for app_id {}", request.app_id);
         AppError::DecryptionError(e.to_string())

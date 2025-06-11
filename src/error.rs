@@ -37,10 +37,14 @@ impl IntoResponse for AppError {
             AppError::EncryptionError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             AppError::DecryptionError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             AppError::InvalidKey(_) => (StatusCode::BAD_REQUEST, self.to_string()),
-            AppError::KeyGenerationError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            AppError::KeyGenerationError(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, self.to_string())
+            }
             AppError::KeyNotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
             AppError::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
-            AppError::QuoteGenerationFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            AppError::QuoteGenerationFailed(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, self.to_string())
+            }
             AppError::InvalidInput(_) => (StatusCode::BAD_REQUEST, self.to_string()),
         };
 

@@ -1,6 +1,10 @@
-use std::sync::Arc;
+use crate::{
+    error::AppError,
+    key_store::KeyStore,
+    types::{PrivateKeyRequest, PrivateKeyResponse},
+};
 use axum::{extract::State, response::IntoResponse, Json};
-use crate::{error::AppError, key_store::KeyStore, types::{PrivateKeyRequest, PrivateKeyResponse}};
+use std::sync::Arc;
 
 pub async fn private_key_request(
     State(key_store): State<Arc<KeyStore>>,
@@ -20,7 +24,24 @@ pub async fn private_key_request(
     })?;
 
     tracing::debug!("Encrypting private key");
-    let encrypted_private_key = ecies::encrypt(&request.public_key, &private_key).map_err(|e| {
+    let (ephemeral_pub_key, ciphertext) = encrypt_private_key(&private_key, &request.public_key)?;
+
+    tracing::info!(
+        app_id = request.app_id,
+        "Successfully retrieved and encrypted private key"
+    );
+
+    Ok(Json(PrivateKeyResponse {
+        ephemeral_pub_key: ephemeral_pub_key.to_vec(),
+        ciphertext: ciphertext.to_vec(),
+    }))
+}
+
+pub fn encrypt_private_key(
+    private_key: &[u8],
+    public_key: &[u8],
+) -> Result<(Vec<u8>, Vec<u8>), AppError> {
+    let encrypted_private_key = ecies::encrypt(public_key, private_key).map_err(|e| {
         tracing::error!(error = %e, "Failed to encrypt private key");
         AppError::EncryptionError(e.to_string())
     })?;
@@ -28,10 +49,5 @@ pub async fn private_key_request(
     let key_size = ecies::config::get_ephemeral_key_size();
     let (ephemeral_pub_key, ciphertext) = encrypted_private_key.split_at(key_size);
 
-    tracing::info!(app_id = request.app_id, "Successfully retrieved and encrypted private key");
-
-    Ok(Json(PrivateKeyResponse {
-        ephemeral_pub_key: ephemeral_pub_key.to_vec(),
-        ciphertext: ciphertext.to_vec(),
-    }))
+    Ok((ephemeral_pub_key.to_vec(), ciphertext.to_vec()))
 }

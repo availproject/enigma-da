@@ -46,11 +46,11 @@ impl KeyStore {
     }
 
     pub fn get_private_key(&self, app_id: u32) -> Result<Vec<u8>, AppError> {
-       let key = format!("priv:{app_id}");
+        let key = format!("priv:{app_id}");
         match self.db.get(key.as_bytes()) {
             Ok(Some(ivec)) => Ok(ivec.to_vec()),
             Ok(None) => Err(AppError::KeyNotFound(app_id)),
             Err(e) => Err(AppError::Database(e.to_string())),
+        }
     }
-}
 }
