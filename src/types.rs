@@ -17,6 +17,18 @@ pub struct EncryptResponse {
     pub ephemeral_pub_key: Vec<u8>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct PrivateKeyRequest {
+    pub app_id: u32,
+    pub public_key: Vec<u8>
+}
+
+#[derive(Debug, Serialize)]
+pub struct PrivateKeyResponse {
+    pub ephemeral_pub_key: Vec<u8>,
+    pub ciphertext: Vec<u8>,
+}
+
 #[derive(Serialize)]
 pub struct QuoteResponse {
     pub quote: GetQuoteResponse,
