@@ -11,7 +11,7 @@ pub mod key_store;
 pub mod tracer;
 pub mod types;
 
-use api::{decrypt, encrypt, reencrypt, quote, register};
+use api::{decrypt, encrypt, quote, reencrypt, register};
 use key_store::KeyStore;
 use tracer::{init_tracer, TracingConfig};
 

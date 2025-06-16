@@ -42,9 +42,7 @@ async fn test_private_key_request_endpoint() {
         public_key: client_public_key.serialize().to_vec(),
     };
 
-    let response = reencrypt(State(key_store), Json(request))
-        .await
-        .unwrap();
+    let response = reencrypt(State(key_store), Json(request)).await.unwrap();
 
     // Extract the response data
     let response_body = response.into_response().into_body();
