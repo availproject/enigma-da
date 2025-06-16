@@ -1,4 +1,4 @@
-use crate::api::private_key_request::{encrypt_private_key, private_key_request};
+use crate::api::reencrypt::{encrypt_private_key, reencrypt};
 use crate::key_store::KeyStore;
 use crate::types::{PrivateKeyRequest, PrivateKeyResponse};
 use axum::{extract::State, response::IntoResponse, Json};
@@ -7,7 +7,7 @@ use http_body_util::BodyExt;
 use rstest::rstest;
 use std::sync::Arc;
 
-const TEST_KEYSTORE_DB_REQUEST_PRIVATE_KEY: &str = "test_keystore_request_private_key_db";
+const TEST_KEYSTORE_DB_REQUEST_PRIVATE_KEY: &str = "test_keystore_reencrypt_db";
 
 #[rstest]
 fn test_encrypt_private_key() {
@@ -42,7 +42,7 @@ async fn test_private_key_request_endpoint() {
         public_key: client_public_key.serialize().to_vec(),
     };
 
-    let response = private_key_request(State(key_store), Json(request))
+    let response = reencrypt(State(key_store), Json(request))
         .await
         .unwrap();
 

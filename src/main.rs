@@ -11,7 +11,7 @@ pub mod key_store;
 pub mod tracer;
 pub mod types;
 
-use api::{decrypt, encrypt, private_key_request, quote, register};
+use api::{decrypt, encrypt, reencrypt, quote, register};
 use key_store::KeyStore;
 use tracer::{init_tracer, TracingConfig};
 
@@ -33,7 +33,7 @@ async fn main() {
         .route("/v1/encrypt", post(encrypt))
         .route("/v1/decrypt", post(decrypt))
         .route("/v1/quote", get(quote))
-        .route("/v1/private-key", post(private_key_request))
+        .route("/v1/private-key", post(reencrypt))
         .layer(TraceLayer::new_for_http())
         .with_state(key_store);
 

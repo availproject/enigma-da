@@ -6,12 +6,12 @@ use crate::{
 use axum::{extract::State, response::IntoResponse, Json};
 use std::sync::Arc;
 
-pub async fn private_key_request(
+pub async fn reencrypt(
     State(key_store): State<Arc<KeyStore>>,
     Json(request): Json<PrivateKeyRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let request_span = tracing::info_span!(
-        "private_key_request",
+        "reencrypt",
         app_id = request.app_id,
         public_key_length = request.public_key.len()
     );
