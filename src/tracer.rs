@@ -1,4 +1,4 @@
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, fmt::format::FmtSpan};
+use tracing_subscriber::{fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Debug, Clone)]
 pub struct TracingConfig {
@@ -30,7 +30,7 @@ pub fn init_tracer(config: TracingConfig) {
                 .with_target(true)
                 .with_thread_ids(true)
                 .with_thread_names(true)
-                .with_ansi(false)
+                .with_ansi(false),
         )
         .init();
 }

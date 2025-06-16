@@ -1,11 +1,7 @@
 use crate::error::AppError;
 use crate::key_store::KeyStore;
 use crate::types::{RegisterRequest, RegisterResponse};
-use axum::{
-    extract::State,
-    response::IntoResponse,
-    Json, 
-};
+use axum::{extract::State, response::IntoResponse, Json};
 use std::sync::Arc;
 
 pub async fn register(
@@ -25,11 +21,14 @@ pub async fn register(
             }));
         }
         Err(AppError::KeyNotFound(_)) => {
-            tracing::info!(app_id = request.app_id, "App ID not found, proceeding with registration");
+            tracing::info!(
+                app_id = request.app_id,
+                "App ID not found, proceeding with registration"
+            );
         }
         Err(e) => {
             tracing::error!(error = ?e, "Database error during public key lookup");
-            return Err(e); 
+            return Err(e);
         }
     }
 
