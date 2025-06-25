@@ -42,6 +42,7 @@ async fn test_decrypt_request_endpoint() {
     // Decrypt the ciphertext
     let request = DecryptRequest {
         app_id: 123,
+        turbo_da_app_id: Uuid::new_v4(),
         ciphertext: encrypt_response.ciphertext,
         ephemeral_pub_key: encrypt_response.ephemeral_pub_key,
     };
