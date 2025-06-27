@@ -1,0 +1,20 @@
+syntax = "proto3";
+package new_schemes;
+
+enum ThresholdScheme {
+    ECIESThreshold = 0;
+    
+}
+
+enum ThresholdOperation {
+    Encryption = 0;
+   
+}
+
+message PublicKeyEntry {
+    string id = 1;
+    new_schemes.ThresholdOperation operation = 2;
+    new_schemes.ThresholdScheme scheme = 3;
+    bytes key = 4;
+}
+

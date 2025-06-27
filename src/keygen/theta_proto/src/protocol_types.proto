@@ -1,0 +1,23 @@
+syntax = "proto3";
+package protocol_types;
+
+import "new_schemes.proto"; // Must be relative to the "includes" in build.rs
+
+// Convention: Use proto type 'bytes' (vec<u8> in Rust) for serialized data structures
+// and string (String in Rust) for the rest
+
+service ThresholdCryptoLibrary {
+    // returns one or more public keys matching the request
+    rpc get_public_keys (KeyRequest) returns (KeyResponse);
+
+}
+
+// ---------- Keys ----------
+message KeyRequest {
+}
+
+message KeyResponse {
+    repeated new_schemes.PublicKeyEntry keys = 1;
+}
+
+
