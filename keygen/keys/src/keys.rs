@@ -1,18 +1,14 @@
 #![allow(non_snake_case)]
-
+use super::key_type::{ECIESPrivateKey, ECIESPublicKey};
 use crate::interface::{SchemeError, Serializable};
-// use crate::mcore::hash256::HASH256;
 use crate::scheme_types_imp::SchemeDetails;
 use asn1::ParseError;
 use asn1::WriteError;
 use base64::{Engine as _, engine::general_purpose};
 use ecies::PublicKey as EciesPublicKey;
-
 use rasn::AsnType;
 use serde::ser::SerializeSeq;
 use theta_proto::new_schemes::{ThresholdOperation, ThresholdScheme};
-
-use super::key_type::{ECIESPrivateKey, ECIESPublicKey};
 
 #[derive(AsnType, Clone, PartialEq, Debug)]
 #[rasn(enumerated)]
@@ -346,15 +342,3 @@ impl<'de> serde::de::Visitor<'de> for PublicKeyVisitor {
         Ok(key.unwrap())
     }
 }
-
-// pub fn calc_key_id(bytes: &[u8]) -> String {
-//     let mut hash = HASH256::new();
-//     hash.process_array(&bytes);
-//     general_purpose::URL_SAFE.encode(hash.hash())
-// }
-
-// // key2id here calculated from publickey which is a projectivepoint type
-// pub fn key2id(key: &EciesPublicKey) -> String {
-//     let bytes: [u8; 33] = key.serialize_compressed();
-//     calc_key_id(&bytes)
-// }

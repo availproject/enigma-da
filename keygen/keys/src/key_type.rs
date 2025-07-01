@@ -101,18 +101,6 @@ impl Serializable for ECIESPublicKey {
 //     ProjectivePoint::from_bytes(&repr).into()
 // }
 
-/// ThresholdDecryptionError
-#[derive(Clone, Debug, thiserror::Error)]
-pub enum ThresholdDecryptionError {
-    /// Invalid message
-    #[error("Invalid message")]
-    InvalidMessage,
-
-    /// Verification Error
-    #[error("Verification Error")]
-    VerificationError,
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct ECIESPrivateKey {
     pub id: u8,

@@ -39,7 +39,7 @@ pub fn keygen(
     dir: &str,
     new: bool,
     app_id: u32,
-) -> Result<(Vec<u8>), Error> {
+) -> Result<Vec<u8>, Error> {
     // let parts = a.split(',');
     let mut keys = HashMap::new();
     let mut rng = rand::thread_rng();
@@ -86,14 +86,18 @@ pub fn keygen(
         .expect("Error generating keys");
 
     // Extraction of the public key and creation of a .pub file
-    let pubkey = key[0].get_public_key().to_bytes().unwrap();
+    let pubkey = key[0].get_public_key();
+    let publickey = pubkey.to_bytes().unwrap();
+    let public_key = pubkey.get_pk().serialize().to_vec();
+    println!("public_key_length_fromlib{}", public_key.len());
+
     let file = File::create(format!(
         "{}/pub/{}_{}.pub",
         dir,
         scheme_str,
         key[0].get_app_id()
     ));
-    if let Err(e) = file.unwrap().write_all(&pubkey) {
+    if let Err(e) = file.unwrap().write_all(&publickey) {
         error!("Error storing public key: {}", e.to_string());
         return Err(Error::Threshold(SchemeError::IOError));
     }
@@ -121,5 +125,5 @@ pub fn keygen(
     }
 
     info!("Keys successfully generated.");
-    return Ok(pubkey);
+    return Ok(public_key);
 }

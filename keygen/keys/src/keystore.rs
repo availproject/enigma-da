@@ -1,19 +1,11 @@
+use super::KeyStoreError;
+use super::keys::{PrivateKeyShare, PublicKey};
+use crate::scheme_types_imp::SchemeDetails;
 use log::error;
 use serde::{Deserialize, Serialize};
-
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-
-// use theta_proto::new_schemes::PublicKeyEntry;
-// use theta_proto::new_schemes::{ThresholdOperation, ThresholdScheme};
-
-// use crate::interface::Serializable;
-
-use crate::scheme_types_imp::SchemeDetails;
-
-use super::KeyStoreError;
-use super::keys::{PrivateKeyShare, PublicKey};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct KeyEntry {
@@ -39,7 +31,6 @@ impl KeyEntry {
             "{} {} {} {}",
             &self.id,
             self.pk.get_scheme().as_str_name(),
-            // self.pk.get_group().as_str_name(),
             postfix,
             default_string
         )
@@ -157,7 +148,7 @@ impl KeyStore {
 
         Ok(())
     }
-
+    //will change this func to import_public_key from the keyresponse
     // pub fn import_public_keys(&mut self, public_keys: &[PublicKeyEntry]) -> Result<(), String> {
     //     for entry in public_keys {
     //         let key = PublicKey::from_bytes(&entry.key);
@@ -252,3 +243,4 @@ impl KeyStore {
         return Ok(self.key_entries.get(id).unwrap().clone());
     }
 }
+

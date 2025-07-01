@@ -38,6 +38,7 @@ pub async fn encrypt(
     //     .expect("Failed to convert key to account");
 
     tracing::debug!("Retrieving public key for encryption");
+
     let public_key = key_store.get_public_key(request.app_id).map_err(|e| {
         tracing::error!(error = %e, "Failed to retrieve public key");
         AppError::KeyNotFound(request.app_id)

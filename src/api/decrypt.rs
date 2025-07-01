@@ -25,6 +25,11 @@ pub async fn decrypt(
     let mut full_ciphertext = request.ephemeral_pub_key.clone();
     full_ciphertext.extend_from_slice(&request.ciphertext);
 
+    tracing::debug!(
+        "Attempting to decrypt ciphertext for app_id {}",
+        request.app_id
+    );
+
     let plaintext = ecies::decrypt(&private_key, &full_ciphertext).map_err(|e| {
         tracing::error!(error = %e, "Decryption failed");
         AppError::DecryptionError(e.to_string())

@@ -3,7 +3,6 @@ pub mod key_generator;
 pub mod key_type;
 pub mod keys;
 pub mod keystore;
-
 pub mod scheme_types_imp;
 use std::fmt::{self, Debug, Display};
 #[macro_export]
