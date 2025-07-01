@@ -1,15 +1,12 @@
 #![allow(non_snake_case)]
 
 use crate::interface::{SchemeError, Serializable};
-use crate::mcore::hash256::HASH256;
+// use crate::mcore::hash256::HASH256;
 use crate::scheme_types_imp::SchemeDetails;
 use asn1::ParseError;
 use asn1::WriteError;
 use base64::{Engine as _, engine::general_purpose};
 use ecies::PublicKey as EciesPublicKey;
-use elliptic_curve::group::GroupEncoding;
-
-use k256::ProjectivePoint;
 
 use rasn::AsnType;
 use serde::ser::SerializeSeq;
@@ -89,7 +86,7 @@ impl PublicKey {
             PublicKey::ECIESThreshold(pk) => pk.k,
         }
     }
-    pub fn get_app_id(&self) -> String {
+    pub fn get_app_id(&self) -> u32 {
         match self {
             PublicKey::ECIESThreshold(pk) => pk.app_id.clone(),
         }
@@ -217,8 +214,7 @@ impl Serializable for PrivateKeyShare {
                         }
 
                         Ok(Self::ECIESThreshold(r.unwrap()))
-                    }
-                    _ => Err(ParseError::new(asn1::ParseErrorKind::InvalidValue)), // In case of mismatch
+                    } // _ => Err(ParseError::new(asn1::ParseErrorKind::InvalidValue)), // In case of mismatch
                 }
             })
         });
@@ -307,7 +303,7 @@ impl PrivateKeyShare {
         }
     }
 
-    pub fn get_app_id(&self) -> &str {
+    pub fn get_app_id(&self) -> &u32 {
         match self {
             PrivateKeyShare::ECIESThreshold(key) => key.get_app_id(),
         }
@@ -351,14 +347,14 @@ impl<'de> serde::de::Visitor<'de> for PublicKeyVisitor {
     }
 }
 
-pub fn calc_key_id(bytes: &[u8]) -> String {
-    let mut hash = HASH256::new();
-    hash.process_array(&bytes);
-    general_purpose::URL_SAFE.encode(hash.hash())
-}
+// pub fn calc_key_id(bytes: &[u8]) -> String {
+//     let mut hash = HASH256::new();
+//     hash.process_array(&bytes);
+//     general_purpose::URL_SAFE.encode(hash.hash())
+// }
 
-// key2id here calculated from publickey which is a projectivepoint type
-pub fn key2id(key: &EciesPublicKey) -> String {
-    let bytes: [u8; 33] = key.serialize_compressed();
-    calc_key_id(&bytes)
-}
+// // key2id here calculated from publickey which is a projectivepoint type
+// pub fn key2id(key: &EciesPublicKey) -> String {
+//     let bytes: [u8; 33] = key.serialize_compressed();
+//     calc_key_id(&bytes)
+// }

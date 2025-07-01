@@ -37,7 +37,5 @@ pub async fn decrypt(
         "Successfully decrypted data"
     );
 
-    Ok(Json(DecryptResponse {
-        plaintext,
-    }))
+    Ok(Json(DecryptResponse { plaintext }))
 }

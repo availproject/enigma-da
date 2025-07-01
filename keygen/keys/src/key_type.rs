@@ -1,12 +1,10 @@
 // use core::slice::SlicePattern;
 
-use super::keys::calc_key_id;
 use crate::interface::{SchemeError, Serializable};
 use asn1::ParseError;
 
 use ecies::PublicKey;
-use elliptic_curve::group::GroupEncoding;
-use k256::ProjectivePoint;
+
 use vsss_rs_std::Share;
 
 pub type SessionId = [u8; 32];
@@ -16,7 +14,7 @@ pub type SessionId = [u8; 32];
 pub struct ECIESPublicKey {
     pub n: u8,
     pub k: u8,
-    pub app_id: String,
+    pub app_id: u32,
     pub pk: PublicKey,
 }
 impl ECIESPublicKey {
@@ -26,24 +24,15 @@ impl ECIESPublicKey {
     pub fn get_k(&self) -> u8 {
         self.k
     }
-    pub fn get_app_id(&self) -> &str {
+    pub fn get_app_id(&self) -> &u32 {
         &self.app_id
     }
     pub fn get_pk(&self) -> &PublicKey {
         &self.pk
     }
 
-    pub fn new(n: u8, k: u8, pk: PublicKey) -> Self {
-        let mut k = Self {
-            n,
-            k,
-            app_id: String::from(""),
-            pk,
-        };
-
-        let bytes: [u8; 33] = pk.serialize_compressed().try_into().unwrap();
-        let app_id = calc_key_id(&bytes);
-        k.app_id = app_id;
+    pub fn new(n: u8, k: u8, pk: PublicKey, app_id: u32) -> Self {
+        let k = Self { n, k, app_id, pk };
         k
     }
 }
@@ -55,8 +44,8 @@ impl Serializable for ECIESPublicKey {
                 w.write_element(&(self.k as u64))?;
                 let pk_bytes = self.pk.serialize();
                 w.write_element(&pk_bytes.as_slice())?;
-                let app_id_bytes = self.app_id.as_bytes();
-                w.write_element(&app_id_bytes)?;
+                let app_id_bytes = self.app_id.to_be_bytes();
+                w.write_element(&app_id_bytes.as_slice())?;
 
                 Ok(())
             }))
@@ -92,8 +81,11 @@ impl Serializable for ECIESPublicKey {
                         .map_err(|_| ParseError::new(asn1::ParseErrorKind::ExtraData))?
                 };
 
-                let app_id = String::from_utf8(app_id_bytes.to_vec())
-                    .map_err(|_| ParseError::new(asn1::ParseErrorKind::ExtraData))?;
+                let app_id = u32::from_be_bytes(
+                    app_id_bytes
+                        .try_into()
+                        .map_err(|_| ParseError::new(asn1::ParseErrorKind::ExtraData))?,
+                );
 
                 Ok(Self { n, k, app_id, pk })
             })
@@ -102,12 +94,12 @@ impl Serializable for ECIESPublicKey {
         result.map_err(|_| SchemeError::DeserializationFailed)
     }
 }
-pub fn decode_projective_point(b: &[u8]) -> Option<ProjectivePoint> {
-    let mut repr = <ProjectivePoint as GroupEncoding>::Repr::default();
-    AsMut::<[u8]>::as_mut(&mut repr).copy_from_slice(b);
+// pub fn decode_projective_point(b: &[u8]) -> Option<ProjectivePoint> {
+//     let mut repr = <ProjectivePoint as GroupEncoding>::Repr::default();
+//     AsMut::<[u8]>::as_mut(&mut repr).copy_from_slice(b);
 
-    ProjectivePoint::from_bytes(&repr).into()
-}
+//     ProjectivePoint::from_bytes(&repr).into()
+// }
 
 /// ThresholdDecryptionError
 #[derive(Clone, Debug, thiserror::Error)]
@@ -133,7 +125,7 @@ impl ECIESPrivateKey {
         self.id
     }
 
-    pub fn get_app_id(&self) -> &str {
+    pub fn get_app_id(&self) -> &u32 {
         &self.pubkey.app_id
     }
 

@@ -12,7 +12,7 @@ enum ThresholdOperation {
 }
 
 message PublicKeyEntry {
-    string id = 1;
+    u32 id = 1;
     new_schemes.ThresholdOperation operation = 2;
     new_schemes.ThresholdScheme scheme = 3;
     bytes key = 4;

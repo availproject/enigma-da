@@ -4,10 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 
-[workspace]
-members = [
-    "utils",
-    "keys"]
 
 [dependencies]  
 keys = {path ="keys" , version ="0.1.0"}
@@ -34,5 +30,9 @@ terminal-menu = "2.0.6"
 
 [[bin]]
 name = "thetacli"
-path = "bin/thetacli.rs"
+path = "src/bin/thetacli.rs"
+
+[lib]
+name = "keygen"
+path = "src/lib.rs"
 

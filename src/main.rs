@@ -1,6 +1,6 @@
 use axum::{
     routing::{get, post},
-    Router
+    Router,
 };
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
@@ -11,13 +11,12 @@ pub mod key_store;
 pub mod tracer;
 pub mod types;
 
-use api::{encrypt, quote, register, decrypt};
+use api::{decrypt, encrypt, quote, register};
 use key_store::KeyStore;
 use tracer::{init_tracer, TracingConfig};
 
 #[tokio::main]
 async fn main() {
-
     init_tracer(TracingConfig::default());
     tracing::info!("Starting encryption server...");
 
@@ -35,10 +34,8 @@ async fn main() {
         .with_state(key_store);
 
     let addr = "0.0.0.0:3000";
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .unwrap();
-    
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+
     tracing::info!(address = %addr, "Encryption server listening");
     axum::serve(listener, app).await.unwrap();
 }

@@ -13,6 +13,7 @@ impl KeyGenerator {
         t: u8,
         mut rng: &mut impl CryptoRngCore,
         scheme: &ThresholdScheme,
+        app_id: u32,
     ) -> Result<Vec<PrivateKeyShare>, Box<dyn std::error::Error>> {
         match scheme {
             ThresholdScheme::ECIESThreshold => {
@@ -40,7 +41,7 @@ impl KeyGenerator {
                     assert!(verifier.verify(s, b).is_ok(), "share verification failed");
                 }
 
-                let publickey = ECIESPublicKey::new(n, t, public_key.clone());
+                let publickey = ECIESPublicKey::new(n, t, public_key.clone(), app_id);
                 let mut private_keys = Vec::new();
                 for (i, share) in shares.iter().enumerate() {
                     private_keys.push(PrivateKeyShare::ECIESThreshold(ECIESPrivateKey::new(
@@ -67,9 +68,10 @@ mod tests {
         let n = 5u8;
         let t = 3u8;
         let scheme = ThresholdScheme::ECIESThreshold;
+        let app_id: u32 = 1234;
 
-        let keys =
-            KeyGenerator::generate_keys(n, t, &mut rng, &scheme).expect("Failed to generate keys");
+        let keys = KeyGenerator::generate_keys(n, t, &mut rng, &scheme, app_id)
+            .expect("Failed to generate keys");
 
         assert_eq!(keys.len(), n as usize);
     }

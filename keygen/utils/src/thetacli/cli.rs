@@ -12,10 +12,6 @@ pub struct ThetaCliArgs {
 pub enum Commands {
     /// Locally generate keys for threshold schemes
     Keygen(KeyGenArgs),
-    /// Encrypt data using threshold encryption
-    // Enc(EncArgs),
-    /// Manipulate keystores
-    Keystore(KeystoreArgs),
 }
 
 #[derive(Args, Debug)]
@@ -41,6 +37,8 @@ pub struct KeyGenArgs {
         default_value_t = false
     )]
     pub new: bool,
+    #[arg(long, help = "app_id with which new application will register")]
+    pub app_id: u32,
 }
 #[derive(Args, Debug)]
 pub struct EncArgs {

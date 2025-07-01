@@ -54,7 +54,7 @@ pub async fn encrypt(
 
     // activate below code when run within TEE
     // let message_hash = keccak256(ciphertext);
-    // let signature = account 
+    // let signature = account
     //     .sign_hash(&message_hash)
     //     .await
     //     .map_err(|e| {

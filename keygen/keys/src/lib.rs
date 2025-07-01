@@ -24,9 +24,9 @@ macro_rules! unwrap_enum_vec {
 }
 
 pub enum KeyStoreError {
-    DuplicateEntry(String),
+    DuplicateEntry(u32),
     IdMismatch,
-    IdNotFound(String),
+    IdNotFound(u32),
 }
 
 impl Display for KeyStoreError {

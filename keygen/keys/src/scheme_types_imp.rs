@@ -1,6 +1,6 @@
 use crate::interface::SchemeError;
 
-use theta_proto::new_schemes::PublicKeyEntry;
+// use theta_proto::new_schemes::PublicKeyEntry;
 use theta_proto::new_schemes::{ThresholdOperation, ThresholdScheme};
 
 pub trait SchemeDetails {

@@ -1,8 +1,8 @@
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PublicKeyEntry {
-    #[prost(string, tag = "1")]
-    pub id: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "1")]
+    pub id: u32,
     #[prost(enumeration = "ThresholdOperation", tag = "2")]
     pub operation: i32,
     #[prost(enumeration = "ThresholdScheme", tag = "3")]

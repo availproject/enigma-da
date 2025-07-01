@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-use dstack_sdk::dstack_client::GetQuoteResponse;
 use alloy_primitives::{Address, Signature};
+use dstack_sdk::dstack_client::GetQuoteResponse;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
 pub struct EncryptRequest {
@@ -25,6 +25,8 @@ pub struct QuoteResponse {
 #[derive(Debug, Deserialize)]
 pub struct RegisterRequest {
     pub app_id: u32,
+    pub k: u16,
+    pub n: u16,
 }
 
 #[derive(Debug, Serialize)]
