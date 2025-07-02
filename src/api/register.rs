@@ -11,7 +11,7 @@ pub async fn register(
 ) -> Result<impl IntoResponse, AppError> {
     let request_span = tracing::info_span!("register_request", app_id = request.app_id);
     let _guard = request_span.enter();
-  
+
     // Check if app_id is already registered
     match key_store.get_public_key(request.app_id) {
         Ok(existing_key) => {
@@ -34,7 +34,6 @@ pub async fn register(
     }
 
     println!("app id not found");
-
 
     tracing::debug!("Generating new keypair");
     let public_key = (keygen(

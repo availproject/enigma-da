@@ -25,8 +25,7 @@ async fn test_encrypt_request_endpoint() {
 
     // Encrypt the plaintext
     let request = EncryptRequest {
-
-        app_id: 234;
+        app_id: 234,
         plaintext: vec![0; 32],
     };
 

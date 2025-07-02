@@ -1,11 +1,8 @@
-
 use crate::error::AppError;
 
 use crate::types::QuoteResponse;
 use axum::{response::IntoResponse, Json};
 use dstack_sdk::dstack_client::DstackClient;
-
-
 
 pub async fn quote() -> Result<impl IntoResponse, AppError> {
     let client = DstackClient::new(None);
@@ -15,12 +12,10 @@ pub async fn quote() -> Result<impl IntoResponse, AppError> {
         AppError::QuoteGenerationFailed(e.to_string())
     })?;
 
-
     tracing::info!(
         quote_length = quote_resp.quote.len(),
         "Successfully generated quote"
     );
 
     Ok(Json(QuoteResponse { quote: quote_resp }))
-
 }
