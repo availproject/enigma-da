@@ -1551,7 +1551,9 @@ dependencies = [
  "ecies",
  "futures",
  "http-body-util",
+
  "keygen",
+
  "rand 0.8.5",
  "rstest",
  "secp256k1 0.28.2",
@@ -3774,7 +3776,9 @@ dependencies = [
  "regex",
  "relative-path",
  "rustc_version 0.4.1",
- "syn 2.0.104",
+
+ "syn 2.0.98",
+
  "unicode-ident",
 ]
 

@@ -11,14 +11,7 @@ const TEST_KEYSTORE_DB_REQUEST_PRIVATE_KEY: &str = "test_keystore_reencrypt_db";
 
 #[rstest]
 fn test_encrypt_private_key() {
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .with_test_writer()
-        .try_init();
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter("debug")
-        .with_test_writer()
-        .try_init();
+
     let (private_key, public_key) = generate_keypair();
     // Dummy private key to test encryption and decryption
     let temp_private_key = vec![0; 32];
@@ -34,14 +27,7 @@ fn test_encrypt_private_key() {
 
 #[tokio::test]
 async fn test_private_key_request_endpoint() {
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .with_test_writer()
-        .try_init();
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter("debug")
-        .with_test_writer()
-        .try_init();
+
     let key_store = Arc::new(KeyStore::new(TEST_KEYSTORE_DB_REQUEST_PRIVATE_KEY).unwrap());
 
     let (private_key, public_key) = generate_keypair();

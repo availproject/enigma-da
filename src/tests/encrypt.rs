@@ -12,18 +12,21 @@ async fn test_encrypt_request_endpoint() {
     let key_store = Arc::new(KeyStore::new(TEST_KEYSTORE_DB_ENCRYPT_REQUEST).unwrap());
 
     // Register the app
+
     let register_request = RegisterRequest {
         app_id: 234,
         k: 3,
         n: 4,
     };
+
     let _register_response = register(State(key_store.clone()), Json(register_request.clone()))
         .await
         .unwrap();
 
     // Encrypt the plaintext
     let request = EncryptRequest {
-        app_id: 234,
+
+        app_id: 234;
         plaintext: vec![0; 32],
     };
 
@@ -32,7 +35,6 @@ async fn test_encrypt_request_endpoint() {
         .unwrap();
 
     let response_body = response.into_response().into_body();
-
     let response: EncryptResponse =
         serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
 

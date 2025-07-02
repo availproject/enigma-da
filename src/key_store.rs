@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use sled::{Db, IVec};
+use sled::Db;
 
 pub struct KeyStore {
     db: Db,

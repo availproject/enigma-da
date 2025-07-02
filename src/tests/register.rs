@@ -9,6 +9,7 @@ const TEST_KEYSTORE_DB_REGISTER_REQUEST: &str = "test_keystore_register_request_
 
 #[tokio::test]
 async fn test_register_request_endpoint() {
+
     let _ = tracing_subscriber::fmt()
         .with_env_filter("info")
         .with_test_writer()
@@ -25,6 +26,7 @@ async fn test_register_request_endpoint() {
         k: 3,
         n: 4,
     };
+
 
     let response = register(State(key_store), Json(request.clone()))
         .await

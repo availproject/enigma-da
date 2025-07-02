@@ -15,13 +15,32 @@ pub async fn decrypt(
     );
     let _guard = request_span.enter();
 
-    tracing::debug!("Retrieving private key for decryption");
-    let private_key = key_store.get_private_key(request.app_id).map_err(|e| {
-        tracing::error!(error = %e, "Failed to retrieve private key");
-        AppError::KeyNotFound(request.app_id)
-    })?;
+    // Input validation
+    if request.ciphertext.is_empty() || request.ephemeral_pub_key.is_empty() {
+        tracing::warn!(
+            app_id = request.app_id,
+            "Empty ciphertext or ephemeral public key"
+        );
+        return Err(AppError::InvalidInput(
+            "Ciphertext and ephemeral public key must not be empty".into(),
+        ));
+    }
 
-    tracing::debug!("Decrypting ciphertext");
+    // Retrieve private key
+    tracing::debug!("Retrieving private key for app_id {}", request.app_id);
+    let private_key = match key_store.get_private_key(request.app_id) {
+        Ok(key) => key,
+        Err(AppError::KeyNotFound(_)) => {
+            tracing::warn!(app_id = request.app_id, "Private key not found");
+            return Err(AppError::KeyNotFound(request.app_id));
+        }
+        Err(e) => {
+            tracing::error!(error = ?e, "Database error while retrieving private key");
+            return Err(e);
+        }
+    };
+
+    // Construct full ciphertext for ECIES decryption
     let mut full_ciphertext = request.ephemeral_pub_key.clone();
     full_ciphertext.extend_from_slice(&request.ciphertext);
 
@@ -31,7 +50,7 @@ pub async fn decrypt(
     );
 
     let plaintext = ecies::decrypt(&private_key, &full_ciphertext).map_err(|e| {
-        tracing::error!(error = %e, "Decryption failed");
+        tracing::error!(error = ?e, "Decryption failed for app_id {}", request.app_id);
         AppError::DecryptionError(e.to_string())
     })?;
 
