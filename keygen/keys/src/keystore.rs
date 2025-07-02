@@ -201,7 +201,9 @@ impl KeyStore {
             self.key_entries.remove_entry(&app_id);
         }
 
-        self.key_entries.insert(app_id, KeyEntry {
+        self.key_entries.insert(
+            app_id, 
+            KeyEntry {
             id: app_id.clone(),
             is_default,
             pk: key.get_public_key(),
@@ -209,7 +211,7 @@ impl KeyStore {
         },
     );
 
-        Ok(app_id)
+    Ok(app_id)
     }
 
     pub fn insert_public_key(&mut self, key: PublicKey) -> Result<u32, KeyStoreError> {
@@ -225,14 +227,16 @@ impl KeyStore {
             .iter()
             .any(|e| e.1.pk.get_scheme().get_operation() == operation);
 
-        self.key_entries.insert(app_id.clone(), KeyEntry {
+        self.key_entries.insert(
+            app_id.clone(), 
+            KeyEntry {
             id: app_id.clone(),
             is_default,
             sk: None,
             pk: key,
         },
     );
-        Ok(app_id)
+    Ok(app_id)
     }
 
     // Return the matching key with the given app_id, or an error if no key with app_id exists.
