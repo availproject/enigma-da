@@ -1,14 +1,7 @@
-// use core::slice::SlicePattern;
-
 use crate::interface::{SchemeError, Serializable};
 use asn1::ParseError;
-
 use ecies::PublicKey;
-
 use vsss_rs_std::Share;
-
-pub type SessionId = [u8; 32];
-// TODO change name to ecies and also app_id formation
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct ECIESPublicKey {
