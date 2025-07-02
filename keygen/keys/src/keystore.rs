@@ -201,9 +201,7 @@ impl KeyStore {
             self.key_entries.remove_entry(&app_id);
         }
 
-        self.key_entries.insert(
-            app_id, 
-            KeyEntry {
+        self.key_entries.insert(app_id, KeyEntry {
             id: app_id.clone(),
             is_default,
             pk: key.get_public_key(),
@@ -226,9 +224,7 @@ impl KeyStore {
             .iter()
             .any(|e| e.1.pk.get_scheme().get_operation() == operation);
 
-        self.key_entries.insert(
-            app_id.clone(), 
-            KeyEntry {
+        self.key_entries.insert(app_id.clone(), KeyEntry {
             id: app_id.clone(),
             is_default,
             sk: None,
