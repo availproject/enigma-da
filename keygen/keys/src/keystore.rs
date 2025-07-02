@@ -206,7 +206,8 @@ impl KeyStore {
             is_default,
             pk: key.get_public_key(),
             sk: Some(key),
-        });
+        }
+    );
 
         Ok(app_id)
     }
@@ -229,7 +230,8 @@ impl KeyStore {
             is_default,
             sk: None,
             pk: key,
-        });
+        }
+    );
         Ok(app_id)
     }
 
