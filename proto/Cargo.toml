@@ -1,12 +1,12 @@
 [package]
-name = "theta_proto"
+name = "proto"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-tonic = "0.8"
-prost = "0.11"
-serde = { version = "1.0", features = ["derive"] }
+tonic = { workspace = true }
+prost = { workspace = true }
+serde = { workspace = true }
 
 [build-dependencies]
 tonic-build = "0.8"

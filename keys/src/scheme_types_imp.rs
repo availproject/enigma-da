@@ -1,5 +1,5 @@
 use crate::interface::SchemeError;
-use theta_proto::new_schemes::{ThresholdOperation, ThresholdScheme};
+use proto::new_schemes::{ThresholdOperation, ThresholdScheme};
 
 pub trait SchemeDetails {
     fn get_id(&self) -> u8;

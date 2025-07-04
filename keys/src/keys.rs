@@ -8,7 +8,7 @@ use base64::{Engine as _, engine::general_purpose};
 use ecies::PublicKey as EciesPublicKey;
 use rasn::AsnType;
 use serde::ser::SerializeSeq;
-use theta_proto::new_schemes::{ThresholdOperation, ThresholdScheme};
+use proto::new_schemes::{ThresholdOperation, ThresholdScheme};
 
 #[derive(AsnType, Clone, PartialEq, Debug)]
 #[rasn(enumerated)]

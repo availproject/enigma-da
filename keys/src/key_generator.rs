@@ -3,7 +3,7 @@ use super::keys::PrivateKeyShare;
 use crypto_bigint::rand_core::CryptoRngCore;
 use k256::ProjectivePoint;
 use k256::Scalar;
-use theta_proto::new_schemes::ThresholdScheme;
+use proto::new_schemes::ThresholdScheme;
 use vsss_rs_std::pedersen;
 pub struct KeyGenerator {}
 
@@ -40,6 +40,7 @@ impl KeyGenerator {
                 for (s, b) in shares.iter().zip(blind_shares.iter()) {
                     assert!(verifier.verify(s, b).is_ok(), "share verification failed");
                 }
+
 
                 let publickey = ECIESPublicKey::new(n, t, public_key.clone(), app_id);
                 let mut private_keys = Vec::new();

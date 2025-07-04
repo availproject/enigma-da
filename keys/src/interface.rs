@@ -1,5 +1,5 @@
 use std::{error::Error, fmt::Display};
-pub use theta_proto::new_schemes::ThresholdScheme;
+pub use proto::new_schemes::ThresholdScheme;
 
 pub trait Serializable: Sized + Clone + PartialEq {
     fn to_bytes(&self) -> Result<Vec<u8>, SchemeError>;

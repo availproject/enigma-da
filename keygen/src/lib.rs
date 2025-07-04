@@ -6,8 +6,7 @@ use keys::{
 use log::{error, info};
 use std::fs;
 use std::{collections::HashMap, fmt::Debug, fs::File, io::Write, path::PathBuf};
-
-use theta_proto::new_schemes::ThresholdScheme;
+use proto::new_schemes::ThresholdScheme;
 use thiserror::Error;
 
 #[derive(Error)]
