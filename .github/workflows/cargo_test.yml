@@ -26,9 +26,21 @@ jobs:
     
     - name: Check formatting
       run: cargo fmt --all -- --check
+
+    - name: Clone Dstack-TEE/dstack repo
+        uses: actions/checkout@v4
+        with:
+          repository: Dstack-TEE/dstack
+          path: dstack
     
+    - name: Build and Setup dstack
+      run: |
+       cd dstack/sdk/simulator && ./build.sh
+       echo "export DSTACK_SIMULATOR_ENDPOINT=$(pwd)/dstack.sock" >> $GITHUB_ENV
+       ./dstack-simulator &
+
     # - name: Clippy
     #   run: cargo clippy -- -D warnings
-    
+
     - name: Run tests
       run: cargo test --all-features
