@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use crate::key_store::KeyStore;
 use crate::types::{RegisterRequest, RegisterResponse};
-use axum::{extract::State, response::IntoResponse, Json};
+use axum::{Json, extract::State, response::IntoResponse};
 use keygen::keygen;
 use std::sync::Arc;
 

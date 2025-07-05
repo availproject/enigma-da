@@ -4,9 +4,9 @@ use keys::{
     keystore::KeyStore,
 };
 use log::{error, info};
+use proto::new_schemes::ThresholdScheme;
 use std::fs;
 use std::{collections::HashMap, fmt::Debug, fs::File, io::Write, path::PathBuf};
-use proto::new_schemes::ThresholdScheme;
 use thiserror::Error;
 
 #[derive(Error)]
@@ -85,7 +85,7 @@ pub fn keygen(
         .expect("Error generating keys");
 
     // Extraction of the public key and creation of a .pub file
-    let pubkey = key[0].get_public_key();
+    let pubkey = key.0[0].get_public_key();
     let publickey = pubkey.to_bytes().unwrap();
     let public_key = pubkey.get_pk().serialize().to_vec();
     println!("public_key_length_fromlib{}", public_key.len());
@@ -94,7 +94,7 @@ pub fn keygen(
         "{}/pub/{}_{}.pub",
         dir,
         scheme_str,
-        key[0].get_app_id()
+        key.0[0].get_app_id()
     ));
     if let Err(e) = file.unwrap().write_all(&publickey) {
         error!("Error storing public key: {}", e.to_string());
@@ -113,7 +113,12 @@ pub fn keygen(
         }
         // each value in keys is a vector of secret key share (related to the same pk) that needs to be distributed among the right key file (parties)
         for k in keys.clone() {
-            let _ = kc.insert_private_key(k.1[node_id as usize].clone());
+            let key_share = k.1.0[node_id as usize].clone();
+            let verifier = k.1.1[node_id as usize].clone(); // Ensure your generate_keys returns verifier set
+            let result = kc.insert_private_key_with_verifier(&key_share, verifier);
+            if let Err(e) = result {
+                error!("Error inserting key with verifier into KeyStore: {}", e);
+            }
         }
 
         // Here the information about the keys of a specific party are actually being written on file

@@ -1,5 +1,5 @@
 use super::KeyStoreError;
-use super::keys::{PrivateKeyShare, PublicKey};
+use super::keys::{PrivateKeyShare, PublicKey, Verifier};
 use crate::scheme_types_imp::SchemeDetails;
 use log::error;
 use serde::{Deserialize, Serialize};
@@ -13,6 +13,7 @@ pub struct KeyEntry {
     pub(crate) is_default: bool,
     pub sk: Option<PrivateKeyShare>,
     pub pk: PublicKey,
+    pub verifier: Option<Verifier>,
 }
 
 impl KeyEntry {
@@ -50,6 +51,7 @@ struct SerializedKeyEntry {
     pub scheme: String,
     pub operation: String,
     pub key: String,
+    pub verifier: Option<String>,
 }
 
 impl From<Vec<SerializedKeyEntry>> for KeyStore {
@@ -59,33 +61,48 @@ impl From<Vec<SerializedKeyEntry>> for KeyStore {
         for entry in value {
             match entry.key_type.as_str() {
                 "secret" => {
-                    let key = PrivateKeyShare::from_pem(&entry.key);
-                    if key.is_err() {
-                        error!(
-                            "Error deserializing private key share: {}",
-                            key.unwrap_err().to_string()
-                        );
-                        continue;
-                    }
-                    let key = key.unwrap();
-                    let id = kc.insert_private_key(key.clone());
-                    if id.is_err() {
-                        error!("Error inserting private key: {}", id.unwrap_err());
+                    // Try to deserialize the private key share
+                    let key = match PrivateKeyShare::from_pem(&entry.key) {
+                        Ok(k) => k,
+                        Err(e) => {
+                            error!("Error deserializing private key share: {}", e);
+                            continue;
+                        }
+                    };
+                    // Require verifier for secret keys
+                    let verifier_pem = match &entry.verifier {
+                        Some(v) => v,
+                        None => {
+                            error!("Missing verifier for private key share");
+                            continue;
+                        }
+                    };
+
+                    let verifier = match Verifier::from_pem(verifier_pem) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            error!("Error deserializing verifier: {}", e);
+                            continue;
+                        }
+                    };
+
+                    if let Err(e) = kc.insert_private_key_with_verifier(&key, verifier) {
+                        error!("Error inserting private key with verifier: {}", e);
                     }
                 }
-                _ => {
-                    let key = PublicKey::from_pem(&entry.key);
-                    if key.is_err() {
-                        error!(
-                            "Error deserializing public key: {}",
-                            key.unwrap_err().to_string()
-                        );
-                        continue;
-                    }
-                    let id = kc.insert_public_key(key.unwrap());
 
-                    if id.is_err() {
-                        error!("Error inserting public key: {}", id.unwrap_err());
+                // Fallback: treat as public key
+                _ => {
+                    let key = match PublicKey::from_pem(&entry.key) {
+                        Ok(k) => k,
+                        Err(e) => {
+                            error!("Error deserializing public key: {}", e);
+                            continue;
+                        }
+                    };
+
+                    if let Err(e) = kc.insert_public_key(key) {
+                        error!("Error inserting public key: {}", e);
                     }
                 }
             }
@@ -140,6 +157,7 @@ impl KeyStore {
                     true => key.sk.as_ref().unwrap().pem().unwrap(),
                     false => key.pk.pem().unwrap(),
                 },
+                verifier: key.verifier.as_ref().map(|v| v.pem().unwrap()),
             });
         }
 
@@ -201,17 +219,37 @@ impl KeyStore {
             self.key_entries.remove_entry(&app_id);
         }
 
-        self.key_entries.insert(
-            app_id, 
-            KeyEntry {
+        self.key_entries.insert(app_id, KeyEntry {
             id: app_id.clone(),
             is_default,
             pk: key.get_public_key(),
             sk: Some(key),
-        },
-    );
+            verifier: None,
+        });
 
-    Ok(app_id)
+        Ok(app_id)
+    }
+    pub fn insert_private_key_with_verifier(
+        &mut self,
+        key: &PrivateKeyShare,
+        verifier: Verifier,
+    ) -> Result<u32, KeyStoreError> {
+        let app_id = key.get_app_id();
+        if self
+            .key_entries
+            .iter()
+            .any(|e| *e.0 == *app_id && e.1.sk.is_some())
+        {
+            return Err(KeyStoreError::DuplicateEntry(app_id.clone()));
+        }
+        self.key_entries.insert(*app_id, KeyEntry {
+            id: *app_id,
+            is_default: true,
+            pk: key.get_public_key(),
+            sk: Some(key.clone()),
+            verifier: Some(verifier),
+        });
+        Ok(*app_id)
     }
 
     pub fn insert_public_key(&mut self, key: PublicKey) -> Result<u32, KeyStoreError> {
@@ -227,16 +265,14 @@ impl KeyStore {
             .iter()
             .any(|e| e.1.pk.get_scheme().get_operation() == operation);
 
-        self.key_entries.insert(
-            app_id.clone(), 
-            KeyEntry {
+        self.key_entries.insert(app_id.clone(), KeyEntry {
             id: app_id.clone(),
             is_default,
             sk: None,
             pk: key,
-        },
-    );
-    Ok(app_id)
+            verifier: None,
+        });
+        Ok(app_id)
     }
 
     // Return the matching key with the given app_id, or an error if no key with app_id exists.

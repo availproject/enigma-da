@@ -5,7 +5,7 @@ use crate::types::{
 };
 use crate::{api::decrypt, key_store::KeyStore};
 use axum::response::IntoResponse;
-use axum::{extract::State, Json};
+use axum::{Json, extract::State};
 use http_body_util::BodyExt;
 use std::sync::Arc;
 

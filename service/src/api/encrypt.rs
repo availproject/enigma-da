@@ -4,7 +4,7 @@ use crate::types::{EncryptRequest, EncryptResponse};
 use alloy::signers::Signer;
 use alloy_primitives::utils::keccak256;
 use alloy_primitives::{Address, Signature};
-use axum::{extract::State, response::IntoResponse, Json};
+use axum::{Json, extract::State, response::IntoResponse};
 use dstack_sdk::dstack_client::DstackClient;
 use dstack_sdk::ethereum::to_account;
 use std::str::FromStr;

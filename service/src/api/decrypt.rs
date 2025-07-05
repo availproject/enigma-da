@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use crate::key_store::KeyStore;
 use crate::types::{DecryptRequest, DecryptResponse};
-use axum::{extract::State, response::IntoResponse, Json};
+use axum::{Json, extract::State, response::IntoResponse};
 use std::sync::Arc;
 
 pub async fn decrypt(

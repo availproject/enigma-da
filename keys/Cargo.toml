@@ -14,10 +14,7 @@ serde = { workspace = true }
 base64 = { workspace = true }
 serde_json = { workspace = true }
 prost = { workspace = true }
-
-
 crypto-bigint = "0.5"
-
 rand_core = "0.6.4"
 asn1 = "0.13.0"
 rasn = "0.6.1"
@@ -25,4 +22,5 @@ ecies = "0.2"
 vsss_rs_std = { version = "3.0.0-pre4", package = "vsss-rs-std" }
 log = "0.4"
 log4rs = "1.2" 
+bincode = "1.3"
 

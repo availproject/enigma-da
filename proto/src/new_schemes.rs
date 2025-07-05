@@ -1,5 +1,3 @@
-
-
 #[derive(
     serde::Serialize,
     serde::Deserialize,
