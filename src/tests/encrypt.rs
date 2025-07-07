@@ -1,6 +1,6 @@
 use crate::api::register;
 use crate::types::{EncryptRequest, EncryptResponse, RegisterRequest};
-use crate::{api::encrypt, key_store::KeyStore};
+use crate::{api::encrypt, key_store::KeyStore, network_manager::NetworkManager, AppState};
 use axum::{extract::State, response::IntoResponse, Json};
 use http_body_util::BodyExt;
 use std::sync::Arc;
@@ -11,9 +11,18 @@ const TEST_KEYSTORE_DB_ENCRYPT_REQUEST: &str = "test_keystore_encrypt_request_db
 async fn test_encrypt_request_endpoint() {
     let key_store = Arc::new(KeyStore::new(TEST_KEYSTORE_DB_ENCRYPT_REQUEST).unwrap());
 
+    let network_manager = NetworkManager::new(3001, "encryption-service-node".to_string())
+        .await
+        .unwrap();
+    let network_manager_clone = network_manager.clone();
+    let app_state = AppState {
+        key_store,
+        network_manager,
+    };
+
     // Register the app
     let register_request = RegisterRequest { app_id: 123 };
-    let _register_response = register(State(key_store.clone()), Json(register_request.clone()))
+    let _register_response = register(State(app_state.clone()), Json(register_request.clone()))
         .await
         .unwrap();
 
@@ -23,7 +32,7 @@ async fn test_encrypt_request_endpoint() {
         plaintext: vec![0; 32],
     };
 
-    let response = encrypt(State(key_store), Json(request.clone()))
+    let response = encrypt(State(app_state), Json(request.clone()))
         .await
         .unwrap();
 
@@ -35,4 +44,6 @@ async fn test_encrypt_request_endpoint() {
     assert!(response.signature.v());
     assert!(!response.address.is_empty());
     assert!(!response.ephemeral_pub_key.is_empty());
+
+    network_manager_clone.lock().await.shutdown().await.unwrap();
 }

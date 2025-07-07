@@ -1,18 +1,17 @@
 use crate::error::AppError;
-use crate::key_store::KeyStore;
 use crate::types::{RegisterRequest, RegisterResponse};
+use crate::AppState;
 use axum::{extract::State, response::IntoResponse, Json};
-use std::sync::Arc;
 
 pub async fn register(
-    State(key_store): State<Arc<KeyStore>>,
+    State(state): State<AppState>,
     Json(request): Json<RegisterRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let request_span = tracing::info_span!("register_request", app_id = request.app_id);
     let _guard = request_span.enter();
 
     // Check if app_id is already registered
-    match key_store.get_public_key(request.app_id) {
+    match state.key_store.get_public_key(request.app_id) {
         Ok(existing_key) => {
             tracing::warn!(app_id = request.app_id, "App ID already registered");
             return Ok(Json(RegisterResponse {
@@ -43,7 +42,7 @@ pub async fn register(
     }
 
     // Try to store the keys
-    if let Err(e) = key_store.store_keys(
+    if let Err(e) = state.key_store.store_keys(
         request.app_id,
         &public_key.serialize(),
         &private_key.serialize(),

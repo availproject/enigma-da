@@ -1,11 +1,11 @@
 use crate::error::AppError;
-use crate::key_store::KeyStore;
+use crate::p2p::node::NodeCommand;
 use crate::types::{DecryptRequest, DecryptResponse};
+use crate::AppState;
 use axum::{extract::State, response::IntoResponse, Json};
-use std::sync::Arc;
 
 pub async fn decrypt(
-    State(key_store): State<Arc<KeyStore>>,
+    State(state): State<AppState>,
     Json(request): Json<DecryptRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let request_span = tracing::info_span!(
@@ -28,7 +28,7 @@ pub async fn decrypt(
 
     // Retrieve private key
     tracing::debug!("Retrieving private key for app_id {}", request.app_id);
-    let private_key = match key_store.get_private_key(request.app_id) {
+    let private_key = match state.key_store.get_private_key(request.app_id) {
         Ok(key) => key,
         Err(AppError::KeyNotFound(_)) => {
             tracing::warn!(app_id = request.app_id, "Private key not found");
@@ -52,6 +52,21 @@ pub async fn decrypt(
         tracing::error!(error = ?e, "Decryption failed for app_id {}", request.app_id);
         AppError::DecryptionError(e.to_string())
     })?;
+
+    // Send a command to the network node after successful decryption
+    if let Err(e) = state
+        .network_manager
+        .lock()
+        .await
+        .send_command(NodeCommand::StoreShard {
+            app_id: request.app_id.to_string(),
+            shard_index: 0u32, // You can customize this based on your needs
+            shard: String::from_utf8_lossy(&plaintext).to_string(),
+        })
+        .await
+    {
+        tracing::warn!(error = %e, "Failed to send command to network node");
+    }
 
     tracing::info!(
         app_id = request.app_id,

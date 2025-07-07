@@ -1,17 +1,12 @@
 use crate::error::AppError;
-use crate::key_store::KeyStore;
 use crate::types::{EncryptRequest, EncryptResponse};
-use alloy::signers::Signer;
-use alloy_primitives::utils::keccak256;
+use crate::AppState;
 use alloy_primitives::{Address, Signature};
 use axum::{extract::State, response::IntoResponse, Json};
-use dstack_sdk::dstack_client::DstackClient;
-use dstack_sdk::ethereum::to_account;
 use std::str::FromStr;
-use std::sync::Arc;
 
 pub async fn encrypt(
-    State(key_store): State<Arc<KeyStore>>,
+    State(state): State<AppState>,
     Json(request): Json<EncryptRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let request_span = tracing::info_span!(
@@ -38,10 +33,13 @@ pub async fn encrypt(
     //     .expect("Failed to convert key to account");
 
     tracing::debug!("Retrieving public key for encryption");
-    let public_key = key_store.get_public_key(request.app_id).map_err(|e| {
-        tracing::error!(error = %e, "Failed to retrieve public key");
-        AppError::KeyNotFound(request.app_id)
-    })?;
+    let public_key = state
+        .key_store
+        .get_public_key(request.app_id)
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to retrieve public key");
+            AppError::KeyNotFound(request.app_id)
+        })?;
 
     tracing::debug!("Encrypting plaintext");
     let ecies_result = ecies::encrypt(&public_key, &request.plaintext).map_err(|e| {

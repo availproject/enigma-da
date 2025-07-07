@@ -1,6 +1,7 @@
 use crate::api::reencrypt::{encrypt_private_key, reencrypt};
 use crate::key_store::KeyStore;
 use crate::types::{PrivateKeyRequest, PrivateKeyResponse};
+use crate::{network_manager::NetworkManager, AppState};
 use axum::{extract::State, response::IntoResponse, Json};
 use ecies::utils::generate_keypair;
 use http_body_util::BodyExt;
@@ -27,11 +28,20 @@ fn test_encrypt_private_key() {
 #[tokio::test]
 async fn test_private_key_request_endpoint() {
     let key_store = Arc::new(KeyStore::new(TEST_KEYSTORE_DB_REQUEST_PRIVATE_KEY).unwrap());
+    let network_manager = NetworkManager::new(3001, "encryption-service-node".to_string())
+        .await
+        .unwrap();
+    let network_manager_clone = network_manager.clone();
+    let app_state = AppState {
+        key_store: key_store.clone(),
+        network_manager,
+    };
 
     let (private_key, public_key) = generate_keypair();
     let app_id = 123;
 
     key_store
+        .clone()
         .store_keys(app_id, &public_key.serialize(), &private_key.serialize())
         .unwrap();
 
@@ -42,7 +52,7 @@ async fn test_private_key_request_endpoint() {
         public_key: client_public_key.serialize().to_vec(),
     };
 
-    let response = reencrypt(State(key_store), Json(request)).await.unwrap();
+    let response = reencrypt(State(app_state), Json(request)).await.unwrap();
 
     // Extract the response data
     let response_body = response.into_response().into_body();
@@ -62,4 +72,6 @@ async fn test_private_key_request_endpoint() {
 
     // Verify the decrypted private key matches the original
     assert_eq!(decrypted_private_key, private_key.serialize());
+
+    network_manager_clone.lock().await.shutdown().await.unwrap();
 }
