@@ -4,6 +4,7 @@ use crate::{api::encrypt, key_store::KeyStore, network_manager::NetworkManager, 
 use axum::{extract::State, response::IntoResponse, Json};
 use http_body_util::BodyExt;
 use std::sync::Arc;
+use uuid::Uuid;
 
 const TEST_KEYSTORE_DB_ENCRYPT_REQUEST: &str = "test_keystore_encrypt_request_db";
 
@@ -30,6 +31,7 @@ async fn test_encrypt_request_endpoint() {
     let request = EncryptRequest {
         app_id: 123,
         plaintext: vec![0; 32],
+        turbo_da_app_id: Uuid::new_v4(),
     };
 
     let response = encrypt(State(app_state), Json(request.clone()))
@@ -40,8 +42,10 @@ async fn test_encrypt_request_endpoint() {
     let response: EncryptResponse =
         serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
 
+    println!("response: {:?}", response);
+
     assert!(!response.ciphertext.is_empty());
-    assert!(response.signature.v());
+    assert!(response.signature.r() != alloy_primitives::U256::ZERO);
     assert!(!response.address.is_empty());
     assert!(!response.ephemeral_pub_key.is_empty());
 

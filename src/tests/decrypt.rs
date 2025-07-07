@@ -8,6 +8,7 @@ use axum::response::IntoResponse;
 use axum::{extract::State, Json};
 use http_body_util::BodyExt;
 use std::sync::Arc;
+use uuid::Uuid;
 
 const TEST_KEYSTORE_DB_DECRYPT_REQUEST: &str = "test_keystore_decrypt_request_db";
 
@@ -37,6 +38,7 @@ async fn test_decrypt_request_endpoint() {
     let encrypt_request = EncryptRequest {
         app_id: 123,
         plaintext: vec![0; 32],
+        turbo_da_app_id: Uuid::new_v4(),
     };
     let encrypt_response = encrypt(State(app_state.clone()), Json(encrypt_request.clone()))
         .await
@@ -48,6 +50,7 @@ async fn test_decrypt_request_endpoint() {
     // Decrypt the ciphertext
     let request = DecryptRequest {
         app_id: 123,
+        turbo_da_app_id: Uuid::new_v4(),
         ciphertext: encrypt_response.ciphertext,
         ephemeral_pub_key: encrypt_response.ephemeral_pub_key,
     };
