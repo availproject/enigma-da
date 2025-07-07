@@ -28,10 +28,10 @@ jobs:
       run: cargo fmt --all -- --check
 
     - name: Clone Dstack-TEE/dstack repo
-        uses: actions/checkout@v4
-        with:
-          repository: Dstack-TEE/dstack
-          path: dstack
+      uses: actions/checkout@v4
+      with:
+        repository: Dstack-TEE/dstack
+        path: dstack
     
     - name: Build and Setup dstack
       run: |
