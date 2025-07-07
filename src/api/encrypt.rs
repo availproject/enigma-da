@@ -1,9 +1,9 @@
 use crate::error::AppError;
 use crate::types::{EncryptRequest, EncryptResponse};
 use crate::AppState;
-use axum::{extract::State, response::IntoResponse, Json};
 use alloy::signers::Signer;
 use alloy_primitives::utils::keccak256;
+use axum::{extract::State, response::IntoResponse, Json};
 use dstack_sdk::dstack_client::DstackClient;
 use dstack_sdk::ethereum::to_account;
 
