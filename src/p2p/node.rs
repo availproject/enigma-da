@@ -1,5 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
+use crate::p2p::store::P2PStore;
 use crate::p2p::types::{get_p2p_identifier, MessageProtocol, MessageRequest, MessageResponse};
 use libp2p::futures::StreamExt;
 use libp2p::swarm::Config;
@@ -27,7 +28,7 @@ pub struct P2PBehaviour {
 pub struct NetworkNode {
     swarm: Swarm<P2PBehaviour>,
     pending_requests: HashMap<OutboundRequestId, MessageRequest>,
-    shard_storage: HashMap<String, HashMap<u32, String>>, // app_id -> shard_index -> shard
+    shard_store: P2PStore,
     pub node_name: String,
     pub local_peer_id: String,
     shutdown_signal: Option<tokio::sync::oneshot::Sender<()>>,
@@ -138,10 +139,14 @@ impl NetworkNode {
         let listen_addr = format!("/ip4/0.0.0.0/tcp/{}", port);
         swarm.listen_on(listen_addr.parse()?)?;
 
+        // Initialize P2P store with a database path based on node name
+        let db_path = format!("p2p_store_{}", node_name);
+        let shard_store = P2PStore::new(&db_path)?;
+
         Ok(NetworkNode {
             swarm,
             pending_requests: HashMap::new(),
-            shard_storage: HashMap::new(),
+            shard_store,
             node_name,
             local_peer_id: local_peer_id.to_string(),
             shutdown_signal: None,
@@ -162,19 +167,30 @@ impl NetworkNode {
     }
 
     fn store_shard(&mut self, app_id: String, shard_index: u32, shard: String) {
-        self.shard_storage
-            .entry(app_id.clone())
-            .or_default()
-            .insert(shard_index, shard);
-
-        info!(
-            "💾 Stored shard for app_id: {}, shard_index: {}",
-            app_id, shard_index
-        );
+        if let Err(e) = self.shard_store.add_shard(&app_id, shard_index, shard) {
+            warn!(
+                "[{}] ❌ Failed to store shard for app_id: {}, shard_index: {}: {}",
+                self.node_name, app_id, shard_index, e
+            );
+        } else {
+            info!(
+                "[{}] 💾 Stored shard for app_id: {}, shard_index: {}",
+                self.node_name, app_id, shard_index
+            );
+        }
     }
 
     fn get_shard(&self, app_id: &str) -> Option<HashMap<u32, String>> {
-        self.shard_storage.get(app_id).cloned()
+        match self.shard_store.get_all_shards(app_id) {
+            Ok(shards) => Some(shards),
+            Err(e) => {
+                warn!(
+                    "[{}] ❌ Failed to get shards for app_id: {}: {}",
+                    self.node_name, app_id, e
+                );
+                None
+            }
+        }
     }
 
     pub fn get_command_sender(&self) -> mpsc::UnboundedSender<NodeCommand> {
@@ -529,5 +545,9 @@ impl NetworkNode {
             _ => {}
         }
         Ok(())
+    }
+
+    pub fn local_peer_id(&self) -> &str {
+        &self.local_peer_id
     }
 }

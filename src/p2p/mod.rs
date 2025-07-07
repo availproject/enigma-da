@@ -1,3 +1,4 @@
 pub mod node;
 pub mod protocol;
+pub mod store;
 pub mod types;

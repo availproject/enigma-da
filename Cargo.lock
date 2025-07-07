@@ -1581,6 +1581,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "sled",
+ "tempfile",
  "thiserror 1.0.69",
  "tiny-keccak",
  "tokio",

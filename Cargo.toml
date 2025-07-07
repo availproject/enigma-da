@@ -27,6 +27,7 @@ alloy-primitives = "1.1.2"
 sled = "0.34"
 rstest = "0.20.0"
 http-body-util = "0.1.0"
+tempfile = "3.8"
 async-trait = "0.1"
 libp2p = { version = "0.53", features = [
     "tcp",
