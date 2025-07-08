@@ -23,4 +23,6 @@ prost = "0.11"
 tonic = "0.8"
 keygen = { path = "keygen", version = "0.1.0" }
 keys = { path = "keys", version = "0.1.0" }
-proto = { path = "proto", version = "0.1.0" }
+proto = { path = "proto", version = "0.1.0"}
+uuid = {version = "=1.8.0" , features = ["v4","fast-rng","macro-diagnostics", "serde"]}
+ 

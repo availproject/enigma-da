@@ -11,7 +11,8 @@ pub async fn decrypt(
     let request_span = tracing::info_span!(
         "decrypt_request",
         app_id = request.app_id,
-        ciphertext_length = request.ciphertext.len()
+        ciphertext_length = request.ciphertext.len(),
+        turbo_da_app_id = request.turbo_da_app_id.to_string()
     );
     let _guard = request_span.enter();
 

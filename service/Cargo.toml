@@ -11,6 +11,7 @@ rand = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 futures = { workspace = true }
+uuid = {workspace = true}
 axum = "0.8.4"
 dashmap = "5.5"
 ecies = "0.2"
