@@ -4,6 +4,7 @@ members = [
     "keys",
     "proto", 
     "service"]
+exclude = ["enigma-kms-node"]
 resolver = "2"
 
 [workspace.dependencies]
