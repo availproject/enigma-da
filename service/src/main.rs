@@ -1,6 +1,6 @@
 use axum::{
-    routing::{get, post},
     Router,
+    routing::{get, post},
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -19,7 +19,6 @@ pub mod network_manager;
 pub mod p2p;
 pub mod tracer;
 pub mod types;
-
 use api::{decrypt, encrypt, quote, reencrypt, register};
 use key_store::KeyStore;
 use network_manager::NetworkManager;

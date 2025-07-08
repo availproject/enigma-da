@@ -1,7 +1,6 @@
 use crate::api::reencrypt::{encrypt_private_key, reencrypt};
 use crate::key_store::KeyStore;
 use crate::types::{PrivateKeyRequest, PrivateKeyResponse};
-use crate::{network_manager::NetworkManager, AppState};
 use axum::{extract::State, response::IntoResponse, Json};
 use ecies::utils::generate_keypair;
 use http_body_util::BodyExt;

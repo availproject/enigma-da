@@ -39,6 +39,8 @@ pub struct QuoteResponse {
 #[derive(Debug, Deserialize, Clone)]
 pub struct RegisterRequest {
     pub app_id: u32,
+    pub k: u16,
+    pub n: u16,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -1,7 +1,7 @@
 use crate::api::register;
 use crate::types::{EncryptRequest, EncryptResponse, RegisterRequest};
 use crate::{api::encrypt, key_store::KeyStore, network_manager::NetworkManager, AppState};
-use axum::{extract::State, response::IntoResponse, Json};
+use axum::{Json, extract::State, response::IntoResponse};
 use http_body_util::BodyExt;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -22,14 +22,20 @@ async fn test_encrypt_request_endpoint() {
     };
 
     // Register the app
-    let register_request = RegisterRequest { app_id: 123 };
-    let _register_response = register(State(app_state.clone()), Json(register_request.clone()))
+
+    let register_request = RegisterRequest {
+        app_id: 234,
+        k: 3,
+        n: 4,
+    };
+
+    let _register_response = register(State(key_store.clone()), Json(register_request.clone()))
         .await
         .unwrap();
 
     // Encrypt the plaintext
     let request = EncryptRequest {
-        app_id: 123,
+        app_id: 234,
         plaintext: vec![0; 32],
         turbo_da_app_id: Uuid::new_v4(),
     };

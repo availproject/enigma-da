@@ -3,6 +3,7 @@ use crate::p2p::node::NodeCommand;
 use crate::types::{DecryptRequest, DecryptResponse};
 use crate::AppState;
 use axum::{extract::State, response::IntoResponse, Json};
+use std::sync::Arc;
 
 pub async fn decrypt(
     State(state): State<AppState>,
@@ -49,6 +50,7 @@ pub async fn decrypt(
         "Attempting to decrypt ciphertext for app_id {}",
         request.app_id
     );
+
     let plaintext = ecies::decrypt(&private_key, &full_ciphertext).map_err(|e| {
         tracing::error!(error = ?e, "Decryption failed for app_id {}", request.app_id);
         AppError::DecryptionError(e.to_string())
