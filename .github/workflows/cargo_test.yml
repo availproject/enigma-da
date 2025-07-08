@@ -42,13 +42,15 @@ jobs:
         echo "export DSTACK_SIMULATOR_ENDPOINT=$(pwd)/dstack.sock" >> $GITHUB_ENV
         ./dstack-simulator &
 
-    - name: Build enigma kms node & copy binary
+    - name: Build enigma kms node
       run: |
         cd enigma-kms-node && cargo build --features persistent-connection
-        cd .. && cp enigma-kms-node/target/debug/enigma-kms-node target/debug/enigma-kms-node
 
-    - name: list dirs
-      run: cd target/debug && ls -la
+    - name: Build encryption service
+      run: cargo build
+
+    - name: Copy enigma kms node binary
+      run: cp enigma-kms-node/target/debug/enigma-kms-node target/debug/enigma-kms-node
 
     - name: Run tests
       run: RUST_LOG=info cargo test -- --test-threads=1 --nocapture
