@@ -3,7 +3,7 @@ use crate::{
     error::AppError,
     types::{PrivateKeyRequest, PrivateKeyResponse},
 };
-use axum::{extract::State, response::IntoResponse, Json};
+use axum::{Json, extract::State, response::IntoResponse};
 
 pub async fn reencrypt(
     State(state): State<AppState>,

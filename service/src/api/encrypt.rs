@@ -1,6 +1,6 @@
+use crate::AppState;
 use crate::error::AppError;
 use crate::types::{EncryptRequest, EncryptResponse};
-use crate::AppState;
 use alloy::signers::Signer;
 use alloy_primitives::utils::keccak256;
 use axum::{Json, extract::State, response::IntoResponse};

@@ -146,7 +146,7 @@ async fn test_p2p_fetch_shards() -> anyhow::Result<()> {
 // ===============================
 
 fn run_node(name: &str, port: u16) -> anyhow::Result<u32> {
-    let node = Command::new("./target/debug/enigma-kms-node")
+    let node = Command::new("../target/debug/enigma-kms-node")
         .env("RUST_LOG", "info")
         .env("P2P_NODE_NAME", name)
         .env("P2P_NODE_PORT", port.to_string())

@@ -1,9 +1,9 @@
 use crate::api::register;
 use crate::types::RegisterRequest;
 use crate::{
-    key_store::KeyStore, network_manager::NetworkManager, types::RegisterResponse, AppState,
+    AppState, key_store::KeyStore, network_manager::NetworkManager, types::RegisterResponse,
 };
-use axum::{extract::State, response::IntoResponse, Json};
+use axum::{Json, extract::State, response::IntoResponse};
 use http_body_util::BodyExt;
 use std::sync::Arc;
 

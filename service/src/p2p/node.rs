@@ -1,17 +1,17 @@
 use std::{collections::HashMap, time::Duration};
 
 use crate::p2p::store::P2PStore;
-use crate::p2p::types::{get_p2p_identifier, MessageProtocol, MessageRequest, MessageResponse};
+use crate::p2p::types::{MessageProtocol, MessageRequest, MessageResponse, get_p2p_identifier};
 use libp2p::futures::StreamExt;
 use libp2p::swarm::Config;
+use libp2p::{Multiaddr, Transport, ping};
 use libp2p::{
-    gossipsub, identify, kad, mdns, noise,
+    PeerId, Swarm, gossipsub, identify, kad, mdns, noise,
     request_response::{self, OutboundRequestId, ProtocolSupport},
     swarm::NetworkBehaviour,
     swarm::SwarmEvent,
-    tcp, yamux, PeerId, Swarm,
+    tcp, yamux,
 };
-use libp2p::{ping, Multiaddr, Transport};
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 

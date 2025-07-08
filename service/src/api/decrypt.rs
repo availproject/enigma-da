@@ -1,9 +1,8 @@
+use crate::AppState;
 use crate::error::AppError;
 use crate::p2p::node::NodeCommand;
 use crate::types::{DecryptRequest, DecryptResponse};
-use crate::AppState;
-use axum::{extract::State, response::IntoResponse, Json};
-use std::sync::Arc;
+use axum::{Json, extract::State, response::IntoResponse};
 
 pub async fn decrypt(
     State(state): State<AppState>,

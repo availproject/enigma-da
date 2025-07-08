@@ -22,7 +22,7 @@ pub mod types;
 use api::{decrypt, encrypt, quote, reencrypt, register};
 use key_store::KeyStore;
 use network_manager::NetworkManager;
-use tracer::{init_tracer, TracingConfig};
+use tracer::{TracingConfig, init_tracer};
 
 #[cfg(test)]
 mod tests;

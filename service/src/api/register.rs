@@ -1,9 +1,8 @@
+use crate::AppState;
 use crate::error::AppError;
 use crate::types::{RegisterRequest, RegisterResponse};
-use crate::AppState;
-use axum::{extract::State, response::IntoResponse, Json};
+use axum::{Json, extract::State, response::IntoResponse};
 use keygen::keygen;
-use std::sync::Arc;
 
 pub async fn register(
     State(state): State<AppState>,
@@ -54,7 +53,10 @@ pub async fn register(
     // Try to store the keys in the TEE
     let mock_private_key = vec![0; 32];
 
-    if let Err(e) = state.key_store.store_keys(request.app_id, &public_key, &mock_private_key) {
+    if let Err(e) = state
+        .key_store
+        .store_keys(request.app_id, &public_key, &mock_private_key)
+    {
         tracing::error!(error = ?e, "Failed to store keys");
         return Err(e);
     }

@@ -1,6 +1,6 @@
 use crate::api::register;
 use crate::types::{EncryptRequest, EncryptResponse, RegisterRequest};
-use crate::{api::encrypt, key_store::KeyStore, network_manager::NetworkManager, AppState};
+use crate::{AppState, api::encrypt, key_store::KeyStore, network_manager::NetworkManager};
 use axum::{Json, extract::State, response::IntoResponse};
 use http_body_util::BodyExt;
 use std::sync::Arc;

@@ -1,6 +1,6 @@
 use crate::p2p::node::{NetworkNode, NodeCommand};
 use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 use tracing::{error, info, warn};
 
 pub struct NetworkManager {
