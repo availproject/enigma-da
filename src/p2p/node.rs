@@ -140,7 +140,7 @@ impl NetworkNode {
         swarm.listen_on(listen_addr.parse()?)?;
 
         // Initialize P2P store with a database path based on node name
-        let db_path = format!("p2p_store_{}", node_name);
+        let db_path = format!("p2p_store_{}_db", node_name);
         let shard_store = P2PStore::new(&db_path)?;
 
         Ok(NetworkNode {
