@@ -29,7 +29,7 @@ async fn test_encrypt_request_endpoint() {
         n: 4,
     };
 
-    let _register_response = register(State(key_store.clone()), Json(register_request.clone()))
+    let _register_response = register(State(app_state.clone()), Json(register_request.clone()))
         .await
         .unwrap();
 

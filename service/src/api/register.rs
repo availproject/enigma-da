@@ -54,7 +54,7 @@ pub async fn register(
     // Try to store the keys in the TEE
     let mock_private_key = vec![0; 32];
 
-    if let Err(e) = key_store.store_keys(request.app_id, &public_key, &mock_private_key) {
+    if let Err(e) = state.key_store.store_keys(request.app_id, &public_key, &mock_private_key) {
         tracing::error!(error = ?e, "Failed to store keys");
         return Err(e);
     }

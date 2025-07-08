@@ -2,6 +2,7 @@
 name = "service"
 version = "0.1.0"
 edition = "2024"
+build = "../build.rs"
 
 [dependencies]
 keygen = { workspace = true }
@@ -12,6 +13,11 @@ tokio = { workspace = true }
 thiserror = { workspace = true }
 futures = { workspace = true }
 uuid = {workspace = true}
+libp2p = {workspace = true}
+anyhow = {workspace = true}
+lazy_static = {workspace = true}
+bincode = {workspace = true}
+async-trait = {workspace = true}
 axum = "0.8.4"
 dashmap = "5.5"
 ecies = "0.2"
@@ -30,4 +36,4 @@ sled = "0.34"
 [dev-dependencies]
 rstest = "0.20.0"
 http-body-util = "0.1.0"
-
+tempfile = {workspace = true}
