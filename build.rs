@@ -10,7 +10,7 @@ fn main() {
         .expect("Failed to fetch submodule");
     println!("✅ Fetch Submodule Completed!");
     let _ = Command::new("cargo")
-        .current_dir("enigma-kms-node")
+        .current_dir("../enigma-kms-node")
         .arg("build")
         .arg("--features")
         .arg("persistent-connection")

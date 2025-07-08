@@ -1,9 +1,3 @@
-[package]
-name = "encifher-encryption-service"
-version = "0.1.0"
-edition = "2021"
-build = "build.rs"
-
 [workspace]
 members = [
     "keygen",
