@@ -1,7 +1,8 @@
 use crate::error::AppError;
 use crate::key_store::KeyStore;
 use crate::types::{RegisterRequest, RegisterResponse};
-use axum::{extract::State, response::IntoResponse, Json};
+use axum::{Json, extract::State, response::IntoResponse};
+use keygen::keygen;
 use std::sync::Arc;
 
 pub async fn register(
@@ -35,27 +36,32 @@ pub async fn register(
     println!("app id not found");
 
     tracing::debug!("Generating new keypair");
-    let (private_key, public_key) = ecies::utils::generate_keypair();
-
-    if private_key.serialize().is_empty() || public_key.serialize().is_empty() {
-        tracing::error!("Generated empty keypair");
-        return Err(AppError::InvalidKey("Generated keypair is invalid".into()));
-    }
-
-    // Try to store the keys
-    if let Err(e) = key_store.store_keys(
+    let public_key = (keygen(
+        request.k,
+        request.n,
+        "ECIESThreshold",
+        "./conf",
+        true,
         request.app_id,
-        &public_key.serialize(),
-        &private_key.serialize(),
-    ) {
+    ))
+    .map_err(|e| AppError::KeyGenerationError(e.to_string()))?;
+
+    // let (private_key, public_key) = ecies::utils::generate_keypair();
+
+    tracing::debug!("Generated keypair successfully");
+
+    // let _ = key_store.store_keys(request.app_id, &public_key.serialize(), &private_key.serialize());
+    // Try to store the keys in the TEE
+    let mock_private_key = vec![0; 32];
+
+    if let Err(e) = key_store.store_keys(request.app_id, &public_key, &mock_private_key) {
         tracing::error!(error = ?e, "Failed to store keys");
         return Err(e);
     }
-
     tracing::info!(app_id = request.app_id, "Successfully registered new app");
 
     Ok(Json(RegisterResponse {
         app_id: request.app_id,
-        public_key: public_key.serialize().to_vec(),
+        public_key: public_key,
     }))
 }

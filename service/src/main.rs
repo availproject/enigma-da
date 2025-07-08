@@ -1,6 +1,6 @@
 use axum::{
-    routing::{get, post},
     Router,
+    routing::{get, post},
 };
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
@@ -10,10 +10,9 @@ pub mod error;
 pub mod key_store;
 pub mod tracer;
 pub mod types;
-
 use api::{decrypt, encrypt, quote, reencrypt, register};
 use key_store::KeyStore;
-use tracer::{init_tracer, TracingConfig};
+use tracer::{TracingConfig, init_tracer};
 
 #[cfg(test)]
 mod tests;

@@ -21,3 +21,4 @@ Cargo.lock
 #.idea/
 keystore_db
 **/*_db
+service/conf/

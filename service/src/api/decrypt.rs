@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use crate::key_store::KeyStore;
 use crate::types::{DecryptRequest, DecryptResponse};
-use axum::{extract::State, response::IntoResponse, Json};
+use axum::{Json, extract::State, response::IntoResponse};
 use std::sync::Arc;
 
 pub async fn decrypt(
@@ -49,6 +49,7 @@ pub async fn decrypt(
         "Attempting to decrypt ciphertext for app_id {}",
         request.app_id
     );
+
     let plaintext = ecies::decrypt(&private_key, &full_ciphertext).map_err(|e| {
         tracing::error!(error = ?e, "Decryption failed for app_id {}", request.app_id);
         AppError::DecryptionError(e.to_string())
