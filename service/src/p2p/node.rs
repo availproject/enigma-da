@@ -1,6 +1,4 @@
 use std::{collections::HashMap, time::Duration};
-
-use crate::error::AppError;
 use crate::p2p::store::P2PStore;
 use crate::p2p::types::{MessageProtocol, MessageRequest, MessageResponse, get_p2p_identifier};
 use keys::keys::{PrivateKeyShare, Verifier};
@@ -16,7 +14,7 @@ use libp2p::{
 };
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
-use vsss_rs_std::pedersen;
+
 
 #[derive(NetworkBehaviour)]
 pub struct P2PBehaviour {

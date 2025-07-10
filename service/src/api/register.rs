@@ -13,7 +13,7 @@ use std::{
 
 use crate::p2p::node::NodeCommand;
 use libp2p::PeerId;
-use tokio::{sync::Mutex, time::sleep};
+use tokio::time::sleep;
 
 pub async fn register(
     State(state): State<AppState>,
