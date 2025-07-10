@@ -1,4 +1,5 @@
-use crate::api::register::{register, run_node};
+use super::p2p::run_node;
+use crate::api::register::register;
 use crate::types::{NodeInfo, RegisterRequest};
 use crate::{
     AppState, key_store::KeyStore, network_manager::NetworkManager, types::RegisterResponse,
@@ -6,7 +7,6 @@ use crate::{
 use axum::{Json, extract::State, response::IntoResponse};
 use http_body_util::BodyExt;
 use std::sync::Arc;
-
 
 const TEST_KEYSTORE_DB_REGISTER_REQUEST: &str = "test_keystore_register_request_db";
 
@@ -37,7 +37,7 @@ async fn test_register_request_endpoint() {
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     let request = RegisterRequest {
-        app_id: 1256,
+        app_id: 56,
         k: 3,
         n: 4,
         nodes: vec![

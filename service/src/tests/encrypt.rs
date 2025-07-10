@@ -1,5 +1,5 @@
-use crate::api::register::{register, run_node};
-
+use super::p2p::run_node;
+use crate::api::register::register;
 use crate::types::{EncryptRequest, EncryptResponse, NodeInfo, RegisterRequest};
 use crate::{AppState, api::encrypt, key_store::KeyStore, network_manager::NetworkManager};
 use axum::{Json, extract::State, response::IntoResponse};

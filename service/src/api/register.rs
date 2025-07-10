@@ -1,18 +1,17 @@
 use crate::AppState;
 use crate::error::AppError;
+use crate::p2p::node::NodeCommand;
 use crate::types::{RegisterRequest, RegisterResponse};
 use axum::{Json, extract::State, response::IntoResponse};
 use keygen::keygen;
 use keys::keystore::KeyStore;
+use libp2p::PeerId;
 use std::{
     fs::File,
     io::{BufRead, BufReader},
     process::{Command, Stdio},
     time::Duration,
 };
-
-use crate::p2p::node::NodeCommand;
-use libp2p::PeerId;
 use tokio::time::sleep;
 
 pub async fn register(
@@ -109,20 +108,4 @@ fn read_peer_id(name: &str) -> anyhow::Result<PeerId> {
     let peer_id: String =
         String::from_utf8(reader.lines().next().unwrap().unwrap().as_bytes().to_vec())?;
     Ok(peer_id.parse()?)
-}
-
-pub fn run_node(name: &str, port: u16) -> anyhow::Result<u32> {
-    let node = Command::new("../target/debug/enigma-kms-node")
-        .env("RUST_LOG", "info")
-        .env("P2P_NODE_NAME", name)
-        .env("P2P_NODE_PORT", port.to_string())
-        .env("P2P_NODE_PEER_ID_FILE", format!("peer_id_{}.txt", name))
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .expect("Failed to run node");
-
-    let p_id = node.id();
-
-    Ok(p_id)
 }
