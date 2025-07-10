@@ -54,9 +54,29 @@ impl KeyGenerator {
                     verification.push(Verifier::ECIESThreshold(ECIESVerifier::new(
                         (i + 1) as u8,
                         blind_share.clone(),
-                        verifier.clone(), // likely needs Clone on PedersenVerifier
+                        verifier.clone(),
                     )));
                 }
+
+                let mut test_shares = Vec::new();
+                for priv_key in private_keys.iter().take(t as usize) {
+                    test_shares.push(priv_key.get_share().clone());
+                }
+                let reconstructed = vsss_rs_std::combine_shares::<Scalar>(&test_shares)
+                    .expect("combine_shares failed");
+                let scalar_bytes = reconstructed
+                    .to_bytes()
+                    .as_slice()
+                    .try_into()
+                    .expect("Failed to convert scalar bytes to [u8; 32]");
+                let reconstructed_key = ecies::SecretKey::parse(&scalar_bytes)
+                    .expect("Failed to reconstruct ECIES SecretKey from scalar");
+
+                // Compare original ECIES key and reconstructed key
+                assert_eq!(
+                    secret_key, reconstructed_key,
+                    "Reconstructed ECIES secret key does not match original"
+                );
 
                 Ok((private_keys, verification))
             }

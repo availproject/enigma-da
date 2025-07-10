@@ -283,6 +283,11 @@ impl PrivateKeyShare {
             PrivateKeyShare::ECIESThreshold(_) => ThresholdScheme::ECIESThreshold,
         }
     }
+    pub fn get_share(&self) -> &Share {
+        match self {
+            PrivateKeyShare::ECIESThreshold(key) => key.get_share(),
+        }
+    }
     pub fn get_share_id(&self) -> u8 {
         match self {
             PrivateKeyShare::ECIESThreshold(key) => key.get_share_id(),

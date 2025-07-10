@@ -37,12 +37,18 @@ pub struct PrivateKeyResponse {
 pub struct QuoteResponse {
     pub quote: GetQuoteResponse,
 }
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct NodeInfo {
+    pub name: String,    // "node1"
+    pub address: String, // "127.0.0.1:9000"
+}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct RegisterRequest {
     pub app_id: u32,
     pub k: u16,
     pub n: u16,
+    pub nodes: Vec<NodeInfo>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
