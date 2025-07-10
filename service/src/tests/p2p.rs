@@ -44,12 +44,15 @@ async fn test_p2p_send_shards() -> anyhow::Result<()> {
     sleep(Duration::from_secs(1)).await; // Give the main node time to start
     println!("⏰ Main Node startup wait completed");
 
+    let job_id = uuid::Uuid::new_v4();
+
     // send a shard to the node 1
     command_sender.send(NodeCommand::SendShard {
         peer_id: node1_peer_id.to_string(),
         app_id: "app1".to_string(),
         shard_index: 0,
         shard: "shard1".to_string(),
+        job_id,
     })?;
     // send a shard to the node 2
     command_sender.send(NodeCommand::SendShard {
@@ -57,6 +60,7 @@ async fn test_p2p_send_shards() -> anyhow::Result<()> {
         app_id: "app1".to_string(),
         shard_index: 1,
         shard: "shard2".to_string(),
+        job_id,
     })?;
 
     sleep(Duration::from_secs(10)).await;
@@ -102,12 +106,15 @@ async fn test_p2p_fetch_shards() -> anyhow::Result<()> {
     sleep(Duration::from_secs(1)).await; // Give the main node time to start
     println!("⏰ Main Node startup wait completed");
 
+    let job_id = uuid::Uuid::new_v4();
+
     // send a shard to the node 1
     command_sender.send(NodeCommand::SendShard {
         peer_id: node1_peer_id.to_string(),
         app_id: "app1".to_string(),
         shard_index: 0,
         shard: "shard1".to_string(),
+        job_id,
     })?;
     // send a shard to the node 2
     command_sender.send(NodeCommand::SendShard {
@@ -115,6 +122,7 @@ async fn test_p2p_fetch_shards() -> anyhow::Result<()> {
         app_id: "app1".to_string(),
         shard_index: 1,
         shard: "shard2".to_string(),
+        job_id,
     })?;
 
     // wait for shards to be stored in the nodes
@@ -124,10 +132,12 @@ async fn test_p2p_fetch_shards() -> anyhow::Result<()> {
     command_sender.send(NodeCommand::RequestShard {
         peer_id: node1_peer_id.to_string(),
         app_id: "app1".to_string(),
+        job_id,
     })?;
     command_sender.send(NodeCommand::RequestShard {
         peer_id: node2_peer_id.to_string(),
         app_id: "app1".to_string(),
+        job_id,
     })?;
 
     sleep(Duration::from_secs(10)).await;

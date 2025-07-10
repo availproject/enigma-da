@@ -1,33 +1,42 @@
+use crate::db::types::{
+    DECRYPT_REQUEST_PREFIX, DecryptRequestData, PEER_ID_PREFIX, PUBLIC_KEY_PREFIX, PeerIdData,
+    SHARD_PREFIX, ShardData,
+};
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
 use sled::Db;
 use std::collections::HashMap;
 
-// Key prefixes for different data types
-const SHARD_PREFIX: &str = "shard:";
-const PEER_ID_PREFIX: &str = "peer:";
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ShardData {
-    pub app_id: String,
-    pub shard_index: u32,
-    pub shard: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PeerIdData {
-    pub app_id: String,
-    pub peer_ids: Vec<String>,
-}
-
-pub struct P2PStore {
+pub struct DataStore {
     db: Db,
 }
 
-impl P2PStore {
+impl DataStore {
     pub fn new(db_path: &str) -> Result<Self> {
         let db = sled::open(db_path)?;
         Ok(Self { db })
+    }
+
+    pub fn store_public_key(&self, app_id: u32, public_key: &[u8]) -> Result<()> {
+        if public_key.is_empty() {
+            return Err(anyhow::anyhow!("Keys cannot be empty"));
+        }
+
+        let pub_key_key = format!("{}:{app_id}", PUBLIC_KEY_PREFIX);
+
+        self.db
+            .insert(pub_key_key.as_bytes(), public_key)
+            .map_err(|e| anyhow::anyhow!("Failed to store public key: {}", e))?;
+
+        Ok(())
+    }
+
+    pub fn get_public_key(&self, app_id: u32) -> Result<Vec<u8>> {
+        let pub_key_key = format!("{}:{app_id}", PUBLIC_KEY_PREFIX);
+        match self.db.get(pub_key_key.as_bytes()) {
+            Ok(Some(ivec)) => Ok(ivec.to_vec()),
+            Ok(None) => Err(anyhow::anyhow!("Public key not found")),
+            Err(e) => Err(anyhow::anyhow!("Failed to get public key: {}", e)),
+        }
     }
 
     /// Get a specific shard for an app
@@ -37,6 +46,18 @@ impl P2PStore {
             Some(value) => {
                 let shard_data: ShardData = bincode::deserialize(&value)?;
                 Ok(Some(shard_data.shard))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Get a specific shard data (including timestamp) for an app
+    pub fn get_shard_data(&self, app_id: &str, shard_index: u32) -> Result<Option<ShardData>> {
+        let key = format!("{}:{}:{}", SHARD_PREFIX, app_id, shard_index);
+        match self.db.get(key.as_bytes())? {
+            Some(value) => {
+                let shard_data: ShardData = bincode::deserialize(&value)?;
+                Ok(Some(shard_data))
             }
             None => Ok(None),
         }
@@ -75,6 +96,10 @@ impl P2PStore {
             app_id: app_id.to_string(),
             shard_index,
             shard,
+            time_stamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
         };
         let value = bincode::serialize(&shard_data)?;
         self.db.insert(key.as_bytes(), value)?;
@@ -128,6 +153,34 @@ impl P2PStore {
         Ok(())
     }
 
+    pub fn store_decrypt_request(&self, request: DecryptRequestData) -> Result<()> {
+        let key = format!("{}:{}", DECRYPT_REQUEST_PREFIX, request.job_id);
+        let value = bincode::serialize(&request)?;
+        self.db.insert(key.as_bytes(), value)?;
+        self.db.flush()?;
+        Ok(())
+    }
+
+    pub fn update_decrypt_request(
+        &self,
+        job_id: uuid::Uuid,
+        request: DecryptRequestData,
+    ) -> Result<()> {
+        let key = format!("{}:{}", DECRYPT_REQUEST_PREFIX, job_id);
+        let value = bincode::serialize(&request)?;
+        self.db.insert(key.as_bytes(), value)?;
+        self.db.flush()?;
+        Ok(())
+    }
+
+    pub fn get_decrypt_request(&self, job_id: uuid::Uuid) -> Result<Option<DecryptRequestData>> {
+        let key = format!("{}:{}", DECRYPT_REQUEST_PREFIX, job_id);
+        match self.db.get(key.as_bytes())? {
+            Some(value) => Ok(Some(bincode::deserialize(&value)?)),
+            None => Ok(None),
+        }
+    }
+
     /// List all app IDs that have stored data
     pub fn list_apps(&self) -> Result<Vec<String>> {
         let mut apps = std::collections::HashSet::new();
@@ -175,7 +228,7 @@ impl P2PStore {
     }
 }
 
-impl Drop for P2PStore {
+impl Drop for DataStore {
     fn drop(&mut self) {
         if let Err(e) = self.db.flush() {
             eprintln!("Failed to flush database on drop: {}", e);

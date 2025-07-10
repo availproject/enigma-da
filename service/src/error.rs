@@ -24,6 +24,8 @@ pub enum AppError {
     QuoteGenerationFailed(String),
     #[error("Decryption failed invalid input: {0}")]
     InvalidInput(String),
+    #[error("Internal error: {0}")]
+    Internal(String),
 }
 
 #[derive(Serialize)]
@@ -46,6 +48,7 @@ impl IntoResponse for AppError {
                 (StatusCode::INTERNAL_SERVER_ERROR, self.to_string())
             }
             AppError::InvalidInput(_) => (StatusCode::BAD_REQUEST, self.to_string()),
+            AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
 
         (status, Json(ErrorResponse { error: message })).into_response()

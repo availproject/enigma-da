@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use crate::p2p::store::P2PStore;
+use crate::db::store::DataStore;
 use crate::p2p::types::{MessageProtocol, MessageRequest, MessageResponse, get_p2p_identifier};
 use libp2p::futures::StreamExt;
 use libp2p::swarm::Config;
@@ -27,8 +27,8 @@ pub struct P2PBehaviour {
 
 pub struct NetworkNode {
     swarm: Swarm<P2PBehaviour>,
-    pending_requests: HashMap<OutboundRequestId, MessageRequest>,
-    shard_store: P2PStore,
+    pending_requests: HashMap<uuid::Uuid, HashMap<OutboundRequestId, MessageRequest>>,
+    shard_store: DataStore,
     pub node_name: String,
     pub local_peer_id: String,
     shutdown_signal: Option<tokio::sync::oneshot::Sender<()>>,
@@ -43,10 +43,12 @@ pub enum NodeCommand {
         app_id: String,
         shard_index: u32,
         shard: String,
+        job_id: uuid::Uuid,
     },
     RequestShard {
         peer_id: String,
         app_id: String,
+        job_id: uuid::Uuid,
     },
     StoreShard {
         app_id: String,
@@ -55,6 +57,10 @@ pub enum NodeCommand {
     },
     GetShard {
         app_id: String,
+    },
+    GetRequestStatus {
+        job_id: uuid::Uuid,
+        response_sender: tokio::sync::oneshot::Sender<Option<(usize, usize)>>,
     },
     Shutdown,
 }
@@ -141,7 +147,7 @@ impl NetworkNode {
 
         // Initialize P2P store with a database path based on node name
         let db_path = format!("p2p_store_{}_db", node_name);
-        let shard_store = P2PStore::new(&db_path)?;
+        let shard_store = DataStore::new(&db_path)?;
 
         Ok(NetworkNode {
             swarm,
@@ -203,6 +209,7 @@ impl NetworkNode {
         app_id: String,
         shard_index: u32,
         shard: String,
+        job_id: uuid::Uuid,
     ) -> anyhow::Result<()> {
         info!(
             "[{}] 🔧 send_shard method called with peer_id: {}, app_id: {}, shard_index: {}",
@@ -213,6 +220,7 @@ impl NetworkNode {
             app_id,
             shard_index,
             shard,
+            job_id,
         });
 
         let request_id = self
@@ -221,7 +229,8 @@ impl NetworkNode {
             .request_response
             .send_request(&peer_id, send_shard.clone());
         debug!("[{}] >>> request_id >>>: {:?}", self.node_name, request_id);
-        self.pending_requests.insert(request_id, send_shard);
+        self.pending_requests
+            .insert(job_id, HashMap::from([(request_id, send_shard)]));
         debug!(
             "[{}] ✅ send_shard method completed successfully",
             self.node_name
@@ -229,14 +238,19 @@ impl NetworkNode {
         Ok(())
     }
 
-    async fn process_request_shard(&mut self, peer_id: &str, app_id: String) -> anyhow::Result<()> {
+    async fn process_request_shard(
+        &mut self,
+        peer_id: &str,
+        app_id: String,
+        job_id: uuid::Uuid,
+    ) -> anyhow::Result<()> {
         info!(
             "[{}] 🔧 request_shard method called with peer_id: {}, app_id: {}",
             self.node_name, peer_id, app_id
         );
         let peer_id: PeerId = peer_id.parse()?;
         let request_shard =
-            MessageRequest::RequestShard(crate::p2p::types::RequestShard { app_id });
+            MessageRequest::RequestShard(crate::p2p::types::RequestShard { app_id, job_id });
 
         let request_id = self
             .swarm
@@ -248,7 +262,8 @@ impl NetworkNode {
             "[{}] 🔧 Request sent with request_id: {:?}",
             self.node_name, request_id
         );
-        self.pending_requests.insert(request_id, request_shard);
+        self.pending_requests
+            .insert(job_id, HashMap::from([(request_id, request_shard)]));
         debug!(
             "[{}] ✅ request_shard method completed successfully",
             self.node_name
@@ -299,13 +314,13 @@ impl NetworkNode {
                 }
                 command = self.command_receiver.recv() => {
                     match command {
-                        Some(NodeCommand::SendShard { peer_id, app_id, shard_index, shard }) => {
+                        Some(NodeCommand::SendShard { peer_id, app_id, shard_index, shard, job_id }) => {
                             info!("[{}] 🔧 Processing SendShard command", self.node_name);
-                            self.process_send_shard(&peer_id, app_id, shard_index, shard).await?;
+                            self.process_send_shard(&peer_id, app_id, shard_index, shard, job_id).await?;
                         }
-                        Some(NodeCommand::RequestShard { peer_id, app_id }) => {
+                        Some(NodeCommand::RequestShard { peer_id, app_id, job_id }) => {
                             info!("[{}] 🔧 Processing RequestShard command", self.node_name);
-                            self.process_request_shard(&peer_id, app_id).await?;
+                            self.process_request_shard(&peer_id, app_id, job_id).await?;
                         }
                         Some(NodeCommand::StoreShard { app_id, shard_index, shard }) => {
                             info!("[{}] 🔧 Processing StoreShard command", self.node_name);
@@ -314,6 +329,13 @@ impl NetworkNode {
                         Some(NodeCommand::GetShard { app_id }) => {
                             info!("[{}] 🔧 Processing GetShard command", self.node_name);
                             self.process_get_shard(&app_id).await?;
+                        }
+                        Some(NodeCommand::GetRequestStatus { job_id, response_sender }) => {
+                            info!("[{}] 🔧 Processing GetRequestStatus command", self.node_name);
+                            let status = self.get_request_status(job_id);
+                            if let Err(e) = response_sender.send(status) {
+                                warn!("[{}] ❌ Failed to send status response: {:?}", self.node_name, e);
+                            }
                         }
                         Some(NodeCommand::Shutdown) => {
                             info!("[{}] 🛑 Shutdown command received", self.node_name);
@@ -369,11 +391,23 @@ impl NetworkNode {
                     self.node_name, peer, request_id, error
                 );
                 // Remove the failed request from pending_requests
-                if let Some(original_request) = self.pending_requests.remove(&request_id) {
-                    warn!(
-                        "[{}] ❌ Failed request was: {:?}",
-                        self.node_name, original_request
-                    );
+                let mut job_id_to_remove = None;
+                for (job_id, requests) in &self.pending_requests {
+                    if requests.contains_key(&request_id) {
+                        job_id_to_remove = Some(*job_id);
+                        break;
+                    }
+                }
+
+                if let Some(job_id) = job_id_to_remove {
+                    if let Some(requests) = self.pending_requests.get_mut(&job_id) {
+                        if let Some(original_request) = requests.remove(&request_id) {
+                            warn!(
+                                "[{}] ❌ Failed request was: {:?}",
+                                self.node_name, original_request
+                            );
+                        }
+                    }
                 }
             }
             P2PBehaviourEvent::RequestResponse(request_response::Event::ResponseSent {
@@ -413,6 +447,7 @@ impl NetworkNode {
                                 let response = MessageResponse {
                                     shard: None,
                                     app_id: send_shard.app_id.clone(),
+                                    job_id: send_shard.job_id,
                                     success: true,
                                     message: "Shard received and stored successfully".to_string(),
                                 };
@@ -437,6 +472,7 @@ impl NetworkNode {
                                     MessageResponse {
                                         shard: Some(bincode::serialize(&shard_data).unwrap()),
                                         app_id: request_shard.app_id.clone(),
+                                        job_id: request_shard.job_id,
                                         success: true,
                                         message: "Shard found and returned".to_string(),
                                     }
@@ -444,6 +480,7 @@ impl NetworkNode {
                                     MessageResponse {
                                         shard: None,
                                         app_id: request_shard.app_id.clone(),
+                                        job_id: request_shard.job_id,
                                         success: false,
                                         message: "Shard not found".to_string(),
                                     }
@@ -469,7 +506,19 @@ impl NetworkNode {
                             "[{}] 🔍 Received response for request_id: {:?}",
                             self.node_name, request_id
                         );
-                        if let Some(original_request) = self.pending_requests.remove(&request_id) {
+                        // Find the job_id that contains this request_id and get the original request
+                        let mut job_id_to_remove = None;
+                        let mut original_request_clone = None;
+
+                        for (job_id, requests) in &self.pending_requests {
+                            if let Some(request) = requests.get(&request_id) {
+                                job_id_to_remove = Some(*job_id);
+                                original_request_clone = Some(request.clone());
+                                break;
+                            }
+                        }
+
+                        if let Some(original_request) = original_request_clone {
                             if response.success {
                                 if let Some(shard) = &response.shard {
                                     info!(
@@ -508,6 +557,13 @@ impl NetworkNode {
                                     "[{}] ❌ Request failed: {} (Request: {:?})",
                                     self.node_name, response.message, original_request
                                 );
+                            }
+
+                            // Remove the request from pending_requests
+                            if let Some(job_id) = job_id_to_remove {
+                                if let Some(requests) = self.pending_requests.get_mut(&job_id) {
+                                    requests.remove(&request_id);
+                                }
                             }
                         } else {
                             warn!(
@@ -549,5 +605,14 @@ impl NetworkNode {
 
     pub fn local_peer_id(&self) -> &str {
         &self.local_peer_id
+    }
+
+    pub fn get_request_status(&self, job_id: uuid::Uuid) -> Option<(usize, usize)> {
+        if let Some(requests) = self.pending_requests.get(&job_id) {
+            let total_requests = requests.len();
+            Some((total_requests, 0))
+        } else {
+            None
+        }
     }
 }

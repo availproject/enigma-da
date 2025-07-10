@@ -1,24 +1,34 @@
 use crate::api::register;
+use crate::db::store::DataStore;
+use crate::handler::worker::JobWorker;
 use crate::types::{EncryptRequest, EncryptResponse, RegisterRequest};
-use crate::{AppState, api::encrypt, key_store::KeyStore, network_manager::NetworkManager};
+use crate::{AppState, api::encrypt, network_manager::NetworkManager};
 use axum::{Json, extract::State, response::IntoResponse};
 use http_body_util::BodyExt;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 const TEST_KEYSTORE_DB_ENCRYPT_REQUEST: &str = "test_keystore_encrypt_request_db";
 
 #[tokio::test]
 async fn test_encrypt_request_endpoint() {
-    let key_store = Arc::new(KeyStore::new(TEST_KEYSTORE_DB_ENCRYPT_REQUEST).unwrap());
+    let data_store = Arc::new(DataStore::new(TEST_KEYSTORE_DB_ENCRYPT_REQUEST).unwrap());
 
     let network_manager = NetworkManager::new(3001, "encryption-service-node".to_string())
         .await
         .unwrap();
     let network_manager_clone = network_manager.clone();
+
+    let worker_manager = Arc::new(Mutex::new(JobWorker::new(
+        data_store.clone(),
+        network_manager.clone(),
+    )));
+
     let app_state = AppState {
-        key_store,
+        data_store,
         network_manager,
+        worker_manager,
     };
 
     // Register the app

@@ -5,6 +5,7 @@ pub mod reencrypt;
 pub mod register;
 
 pub use decrypt::decrypt;
+pub use decrypt::get_decrypt_request_status;
 pub use encrypt::encrypt;
 pub use quote::quote;
 pub use reencrypt::reencrypt;

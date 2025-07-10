@@ -1,11 +1,13 @@
 use crate::api::register;
+use crate::handler::worker::JobWorker;
 use crate::types::RegisterRequest;
 use crate::{
-    AppState, key_store::KeyStore, network_manager::NetworkManager, types::RegisterResponse,
+    AppState, db::store::DataStore, network_manager::NetworkManager, types::RegisterResponse,
 };
 use axum::{Json, extract::State, response::IntoResponse};
 use http_body_util::BodyExt;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 const TEST_KEYSTORE_DB_REGISTER_REQUEST: &str = "test_keystore_register_request_db";
 
@@ -20,14 +22,19 @@ async fn test_register_request_endpoint() {
         .with_test_writer()
         .try_init();
 
-    let key_store = Arc::new(KeyStore::new(TEST_KEYSTORE_DB_REGISTER_REQUEST).unwrap());
+    let data_store = Arc::new(DataStore::new(TEST_KEYSTORE_DB_REGISTER_REQUEST).unwrap());
     let network_manager = NetworkManager::new(3001, "encryption-service-node".to_string())
         .await
         .unwrap();
     let network_manager_clone = network_manager.clone();
+    let worker_manager = Arc::new(Mutex::new(JobWorker::new(
+        data_store.clone(),
+        network_manager.clone(),
+    )));
     let app_state = AppState {
-        key_store,
+        data_store,
         network_manager,
+        worker_manager,
     };
 
     let request = RegisterRequest {

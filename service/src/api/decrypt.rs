@@ -1,7 +1,11 @@
 use crate::AppState;
+use crate::db::types::{DecryptRequestData, DecryptRequestStatus};
 use crate::error::AppError;
-use crate::p2p::node::NodeCommand;
-use crate::types::{DecryptRequest, DecryptResponse};
+use crate::handler::worker::JobType;
+use crate::types::{
+    DecryptRequest, DecryptResponse, GetDecryptRequestStatusRequest,
+    GetDecryptRequestStatusResponse,
+};
 use axum::{Json, extract::State, response::IntoResponse};
 
 pub async fn decrypt(
@@ -27,55 +31,85 @@ pub async fn decrypt(
         ));
     }
 
-    // Retrieve private key
-    tracing::debug!("Retrieving private key for app_id {}", request.app_id);
-    let private_key = match state.key_store.get_private_key(request.app_id) {
-        Ok(key) => key,
-        Err(AppError::KeyNotFound(_)) => {
-            tracing::warn!(app_id = request.app_id, "Private key not found");
-            return Err(AppError::KeyNotFound(request.app_id));
-        }
-        Err(e) => {
-            tracing::error!(error = ?e, "Database error while retrieving private key");
-            return Err(e);
-        }
+    let job_id = uuid::Uuid::new_v4();
+    let request_data = DecryptRequestData {
+        app_id: request.app_id.to_string(),
+        ciphertext_array: request.ciphertext.clone(),
+        ephemeral_pub_key_array: request.ephemeral_pub_key.clone(),
+        job_id,
+        status: DecryptRequestStatus::Pending,
+        decrypted_array: None,
     };
 
-    // Construct full ciphertext for ECIES decryption
-    let mut full_ciphertext = request.ephemeral_pub_key.clone();
-    full_ciphertext.extend_from_slice(&request.ciphertext);
+    state
+        .data_store
+        .store_decrypt_request(request_data)
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to store decrypt request");
+            AppError::Database(e.to_string())
+        })?;
 
     tracing::debug!(
         "Attempting to decrypt ciphertext for app_id {}",
         request.app_id
     );
 
-    let plaintext = ecies::decrypt(&private_key, &full_ciphertext).map_err(|e| {
-        tracing::error!(error = ?e, "Decryption failed for app_id {}", request.app_id);
-        AppError::DecryptionError(e.to_string())
-    })?;
-
-    // Send a command to the network node after successful decryption
-    if let Err(e) = state
-        .network_manager
+    // Send the request to the worker
+    state
+        .worker_manager
         .lock()
         .await
-        .send_command(NodeCommand::StoreShard {
-            app_id: request.app_id.to_string(),
-            shard_index: 0u32, // You can customize this based on your needs
-            shard: String::from_utf8_lossy(&plaintext).to_string(),
-        })
-        .await
-    {
-        tracing::warn!(error = %e, "Failed to send command to network node");
-    }
+        .get_tx()
+        .send(JobType::DecryptJob(
+            request.app_id.to_string(),
+            job_id,
+            request.ciphertext.clone(),
+            request.ephemeral_pub_key.clone(),
+        ))
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to send decrypt job to worker");
+            AppError::Internal(e.to_string())
+        })?;
 
     tracing::info!(
         app_id = request.app_id,
-        ciphertext_length = request.ciphertext.len(),
-        plaintext_length = plaintext.len(),
-        "Successfully decrypted data"
+        job_id = job_id.to_string(),
+        "Successfully sent decrypt job to worker"
     );
 
-    Ok(Json(DecryptResponse { plaintext }))
+    Ok(Json(DecryptResponse { job_id }))
+}
+
+pub async fn get_decrypt_request_status(
+    State(state): State<AppState>,
+    Json(request): Json<GetDecryptRequestStatusRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let request_span = tracing::info_span!(
+        "get_decrypt_request_status",
+        job_id = request.job_id.to_string(),
+    );
+    let _guard = request_span.enter();
+
+    let decrypt_request = state
+        .data_store
+        .get_decrypt_request(request.job_id)
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to get decrypt request status");
+            AppError::Database(e.to_string())
+        })?;
+
+    if decrypt_request.is_none() {
+        tracing::error!(
+            job_id = request.job_id.to_string(),
+            "Decrypt request not found"
+        );
+        return Err(AppError::Internal(format!(
+            "Decrypt request not found for job id: {}",
+            request.job_id.to_string()
+        )));
+    }
+
+    Ok(Json(GetDecryptRequestStatusResponse {
+        request: decrypt_request.unwrap(),
+    }))
 }

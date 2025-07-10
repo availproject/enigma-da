@@ -3,6 +3,8 @@ use dstack_sdk::dstack_client::GetQuoteResponse;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::db::types::DecryptRequestData;
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct EncryptRequest {
     pub app_id: u32,
@@ -53,11 +55,21 @@ pub struct RegisterResponse {
 pub struct DecryptRequest {
     pub app_id: u32,
     pub turbo_da_app_id: Uuid,
-    pub ciphertext: Vec<u8>,
-    pub ephemeral_pub_key: Vec<u8>,
+    pub ciphertext: Vec<Vec<u8>>,
+    pub ephemeral_pub_key: Vec<Vec<u8>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DecryptResponse {
-    pub plaintext: Vec<u8>,
+    pub job_id: Uuid,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GetDecryptRequestStatusRequest {
+    pub job_id: Uuid,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GetDecryptRequestStatusResponse {
+    pub request: DecryptRequestData,
 }
