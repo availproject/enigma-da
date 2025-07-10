@@ -6,7 +6,7 @@ use crate::{
 use axum::{Json, extract::State, response::IntoResponse};
 
 pub async fn reencrypt(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
     Json(request): Json<PrivateKeyRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let request_span = tracing::info_span!(
@@ -17,13 +17,16 @@ pub async fn reencrypt(
     let _guard = request_span.enter();
 
     tracing::debug!("Retrieving private key for app id: {}", request.app_id);
-    let private_key = state
-        .key_store
-        .get_private_key(request.app_id)
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to retrieve private key");
-            AppError::KeyNotFound(request.app_id)
-        })?;
+    let private_key = [0; 32];
+
+    // TODO : update the flow here
+    // let private_key = state
+    //     .data_store
+    //     .get_private_key(request.app_id)
+    //     .map_err(|e| {
+    //         tracing::error!(error = %e, "Failed to retrieve private key");
+    //         AppError::KeyNotFound(request.app_id)
+    //     })?;
 
     tracing::debug!("Encrypting private key");
     let (ephemeral_pub_key, ciphertext) = encrypt_private_key(&private_key, &request.public_key)?;

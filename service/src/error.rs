@@ -29,6 +29,8 @@ pub enum AppError {
     Other(String),
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
+    #[error("Internal error: {0}")]
+    Internal(String),
 }
 
 #[derive(Serialize)]
@@ -53,6 +55,7 @@ impl IntoResponse for AppError {
             AppError::InvalidInput(_) => (StatusCode::BAD_REQUEST, self.to_string()),
             AppError::Other(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             AppError::Io(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
 
         (status, Json(ErrorResponse { error: message })).into_response()

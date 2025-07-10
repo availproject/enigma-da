@@ -22,7 +22,7 @@ pub async fn register(
     let _guard = request_span.enter();
 
     // Check if app_id is already registered
-    match state.key_store.get_public_key(request.app_id) {
+    match state.data_store.get_public_key(request.app_id) {
         Ok(existing_key) => {
             tracing::warn!(app_id = request.app_id, "App ID already registered");
             return Ok(Json(RegisterResponse {
@@ -30,7 +30,7 @@ pub async fn register(
                 public_key: existing_key,
             }));
         }
-        Err(AppError::KeyNotFound(_)) => {
+        Err(e) if e.to_string().contains("Public key not found") => {
             tracing::info!(
                 app_id = request.app_id,
                 "App ID not found, proceeding with registration"
@@ -38,7 +38,7 @@ pub async fn register(
         }
         Err(e) => {
             tracing::error!(error = ?e, "Database error during public key lookup");
-            return Err(e);
+            return Err(AppError::Database(e.to_string()));
         }
     }
 
@@ -88,12 +88,14 @@ pub async fn register(
     // Try to store the keys in the TEE
     let mock_private_key = vec![0; 32];
 
+    tracing::debug!("Generated keypair successfully");
+
     if let Err(e) = state
-        .key_store
-        .store_keys(request.app_id, &public_key, &mock_private_key)
+        .data_store
+        .store_public_key(request.app_id, &public_key)
     {
         tracing::error!(error = ?e, "Failed to store keys");
-        return Err(e);
+        return Err(AppError::Database(e.to_string()));
     }
     tracing::info!(app_id = request.app_id, "Successfully registered new app");
 

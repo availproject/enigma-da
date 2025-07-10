@@ -8,19 +8,22 @@ use tower_http::trace::TraceLayer;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub key_store: Arc<KeyStore>,
+    pub data_store: Arc<DataStore>,
     pub network_manager: Arc<Mutex<NetworkManager>>,
+    pub worker_manager: Arc<Mutex<JobWorker>>,
 }
 
 pub mod api;
+pub mod db;
 pub mod error;
-pub mod key_store;
+pub mod handler;
 pub mod network_manager;
 pub mod p2p;
 pub mod tracer;
 pub mod types;
+use crate::{api::get_decrypt_request_status, handler::worker::JobWorker};
 use api::{decrypt, encrypt, quote, reencrypt, register};
-use key_store::KeyStore;
+use db::store::DataStore;
 use network_manager::NetworkManager;
 use tracer::{TracingConfig, init_tracer};
 
@@ -33,17 +36,25 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Starting encryption server...");
 
     // Initialize key store
-    let key_store = Arc::new(KeyStore::new("keystore_db").unwrap());
+    let data_store = Arc::new(DataStore::new("keystore_db").unwrap());
     tracing::info!("Key store initialized");
 
     // Initialize network manager
     let network_manager = NetworkManager::new(3001, "encryption-service-node".to_string()).await?;
     tracing::info!("Network manager initialized");
 
+    // Initialize worker manager
+    let worker_manager = Arc::new(Mutex::new(JobWorker::new(
+        data_store.clone(),
+        network_manager.clone(),
+    )));
+    tracing::info!("Worker manager initialized");
+
     // Create application state
     let app_state = AppState {
-        key_store,
+        data_store,
         network_manager,
+        worker_manager,
     };
 
     // Application routes
@@ -53,6 +64,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/decrypt", post(decrypt))
         .route("/v1/quote", get(quote))
         .route("/v1/private-key", post(reencrypt))
+        .route("/v1/decrypt-status", get(get_decrypt_request_status))
         .layer(TraceLayer::new_for_http())
         .with_state(app_state);
 

@@ -17,11 +17,13 @@ pub struct SendShards {
     pub app_id: String,
     pub shard: String,
     pub shard_index: u32,
+    pub job_id: uuid::Uuid,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestShard {
     pub app_id: String,
+    pub job_id: uuid::Uuid,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,6 +36,7 @@ pub enum MessageRequest {
 pub struct MessageResponse {
     pub shard: Option<Vec<u8>>,
     pub app_id: String,
+    pub job_id: uuid::Uuid,
     pub success: bool,
     pub message: String,
 }
