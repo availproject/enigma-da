@@ -1,7 +1,9 @@
 use std::{collections::HashMap, time::Duration};
 
+use crate::error::AppError;
 use crate::p2p::store::P2PStore;
 use crate::p2p::types::{MessageProtocol, MessageRequest, MessageResponse, get_p2p_identifier};
+use keys::keys::{PrivateKeyShare, Verifier};
 use libp2p::futures::StreamExt;
 use libp2p::swarm::Config;
 use libp2p::{Multiaddr, Transport, ping};
@@ -14,6 +16,7 @@ use libp2p::{
 };
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
+use vsss_rs_std::pedersen;
 
 #[derive(NetworkBehaviour)]
 pub struct P2PBehaviour {
@@ -167,16 +170,24 @@ impl NetworkNode {
     }
 
     fn store_shard(&mut self, app_id: String, shard_index: u32, shard: String) {
-        if let Err(e) = self.shard_store.add_shard(&app_id, shard_index, shard) {
+        if !self.verify_shard(&app_id, shard_index, &shard) {
             warn!(
-                "[{}] ❌ Failed to store shard for app_id: {}, shard_index: {}: {}",
-                self.node_name, app_id, shard_index, e
-            );
-        } else {
-            info!(
-                "[{}] 💾 Stored shard for app_id: {}, shard_index: {}",
+                "[{}] ❌ Shard verification failed — not storing. app_id: {}, shard_index: {}",
                 self.node_name, app_id, shard_index
             );
+            return;
+        } else {
+            if let Err(e) = self.shard_store.add_shard(&app_id, shard_index, shard) {
+                warn!(
+                    "[{}] ❌ Failed to store shard for app_id: {}, shard_index: {}: {}",
+                    self.node_name, app_id, shard_index, e
+                );
+            } else {
+                info!(
+                    "[{}] 💾 Stored verified shard for app_id: {}, shard_index: {}",
+                    self.node_name, app_id, shard_index
+                );
+            }
         }
     }
 
@@ -270,6 +281,23 @@ impl NetworkNode {
             self.node_name, shard
         );
         Ok(shard)
+    }
+    pub fn verify_shard(&mut self, app_id: &str, shard_index: u32, shard: &str) -> bool {
+        info!(
+            "[{}] 🔍 Called verify_shard for app_id={}, index={}",
+            self.node_name, app_id, shard_index
+        );
+
+        let parsed: Result<(PrivateKeyShare, Verifier), _> = serde_json::from_str(shard);
+
+        if let Ok((sk, verifier)) = parsed {
+            let share = sk.get_share();
+            let blind_share = verifier.get_blind_shares();
+            let vset = verifier.get_verifier_set();
+            vset.verify(share, blind_share).is_ok()
+        } else {
+            false
+        }
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
@@ -392,74 +420,71 @@ impl NetworkNode {
                 match message {
                     request_response::Message::Request {
                         request, channel, ..
-                    } => {
-                        match request {
-                            MessageRequest::SendShard(send_shard) => {
-                                info!(
-                                    "[{}] 📨 Received shard for app_id: {}, shard_index: {}, shard: {}",
-                                    self.node_name,
-                                    send_shard.app_id,
-                                    send_shard.shard_index,
-                                    send_shard.shard
-                                );
+                    } => match request {
+                        MessageRequest::SendShard(send_shard) => {
+                            info!(
+                                "[{}] 📨 Received shard for app_id: {}, shard_index: {}, shard: {}",
+                                self.node_name,
+                                send_shard.app_id,
+                                send_shard.shard_index,
+                                send_shard.shard
+                            );
 
-                                // Store the received shard
-                                self.store_shard(
-                                    send_shard.app_id.clone(),
-                                    send_shard.shard_index,
-                                    send_shard.shard.clone(),
-                                );
+                            self.store_shard(
+                                send_shard.app_id.clone(),
+                                send_shard.shard_index,
+                                send_shard.shard.clone(),
+                            );
+                            let response = MessageResponse {
+                                shard: None,
+                                app_id: send_shard.app_id,
+                                success: true,
+                                message: "Shard received & Verified and stored successfully"
+                                    .to_string(),
+                            };
 
-                                let response = MessageResponse {
-                                    shard: None,
-                                    app_id: send_shard.app_id.clone(),
-                                    success: true,
-                                    message: "Shard received and stored successfully".to_string(),
-                                };
-
-                                if let Err(e) = self
-                                    .swarm
-                                    .behaviour_mut()
-                                    .request_response
-                                    .send_response(channel, response)
-                                {
-                                    warn!("Failed to send response: {:?}", e);
-                                }
-                            }
-                            MessageRequest::RequestShard(request_shard) => {
-                                info!(
-                                    "[{}] 📥 Shard requested for app_id: {}",
-                                    self.node_name, request_shard.app_id
-                                );
-
-                                let shard = self.get_shard(&request_shard.app_id);
-                                let response = if let Some(shard_data) = shard {
-                                    MessageResponse {
-                                        shard: Some(bincode::serialize(&shard_data).unwrap()),
-                                        app_id: request_shard.app_id.clone(),
-                                        success: true,
-                                        message: "Shard found and returned".to_string(),
-                                    }
-                                } else {
-                                    MessageResponse {
-                                        shard: None,
-                                        app_id: request_shard.app_id.clone(),
-                                        success: false,
-                                        message: "Shard not found".to_string(),
-                                    }
-                                };
-
-                                if let Err(e) = self
-                                    .swarm
-                                    .behaviour_mut()
-                                    .request_response
-                                    .send_response(channel, response)
-                                {
-                                    warn!("Failed to send response: {:?}", e);
-                                }
+                            if let Err(e) = self
+                                .swarm
+                                .behaviour_mut()
+                                .request_response
+                                .send_response(channel, response)
+                            {
+                                warn!("Failed to send response: {:?}", e);
                             }
                         }
-                    }
+                        MessageRequest::RequestShard(request_shard) => {
+                            info!(
+                                "[{}] 📥 Shard requested for app_id: {}",
+                                self.node_name, request_shard.app_id
+                            );
+
+                            let shard = self.get_shard(&request_shard.app_id);
+                            let response = if let Some(shard_data) = shard {
+                                MessageResponse {
+                                    shard: Some(bincode::serialize(&shard_data).unwrap()),
+                                    app_id: request_shard.app_id.clone(),
+                                    success: true,
+                                    message: "Shard found and returned".to_string(),
+                                }
+                            } else {
+                                MessageResponse {
+                                    shard: None,
+                                    app_id: request_shard.app_id.clone(),
+                                    success: false,
+                                    message: "Shard not found".to_string(),
+                                }
+                            };
+
+                            if let Err(e) = self
+                                .swarm
+                                .behaviour_mut()
+                                .request_response
+                                .send_response(channel, response)
+                            {
+                                warn!("Failed to send response: {:?}", e);
+                            }
+                        }
+                    },
                     request_response::Message::Response {
                         response,
                         request_id,
@@ -490,6 +515,7 @@ impl NetworkNode {
                                                 );
                                             }
                                         }
+
                                         Err(e) => {
                                             warn!(
                                                 "[{}] ❌ Failed to deserialize shard: {:?}",

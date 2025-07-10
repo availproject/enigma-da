@@ -5162,6 +5162,7 @@ dependencies = [
  "futures",
  "http-body-util",
  "keygen",
+ "keys",
  "lazy_static",
  "libp2p",
  "rand 0.8.5",
@@ -5180,6 +5181,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "vsss-rs-std",
 ]
 
 [[package]]

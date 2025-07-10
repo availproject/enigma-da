@@ -6,6 +6,7 @@ build = "../build.rs"
 
 [dependencies]
 keygen = { workspace = true }
+keys ={workspace=true}
 serde = { workspace = true }
 serde_json = { workspace = true }
 rand = { workspace = true }
@@ -32,6 +33,7 @@ tiny-keccak = "2.0.2"
 alloy = { version = "0.15", default-features = false }
 alloy-primitives = "1.1.2"
 sled = "0.34"
+vsss_rs_std = { version = "3.0.0-pre4", package = "vsss-rs-std" }
 
 [dev-dependencies]
 rstest = "0.20.0"

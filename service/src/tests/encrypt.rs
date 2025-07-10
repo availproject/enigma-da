@@ -1,5 +1,6 @@
-use crate::api::register;
-use crate::types::{EncryptRequest, EncryptResponse, RegisterRequest};
+use crate::api::register::{register, run_node};
+
+use crate::types::{EncryptRequest, EncryptResponse, NodeInfo, RegisterRequest};
 use crate::{AppState, api::encrypt, key_store::KeyStore, network_manager::NetworkManager};
 use axum::{Json, extract::State, response::IntoResponse};
 use http_body_util::BodyExt;
@@ -22,11 +23,33 @@ async fn test_encrypt_request_endpoint() {
     };
 
     // Register the app
+    let _pid1 = run_node("node1", 9000).unwrap();
+    let _pid2 = run_node("node2", 9001).unwrap();
+    let _pid3 = run_node("node3", 9002).unwrap();
+    let _pid4 = run_node("node4", 9003).unwrap();
 
     let register_request = RegisterRequest {
         app_id: 234,
         k: 3,
         n: 4,
+        nodes: vec![
+            NodeInfo {
+                name: "node1".to_string(),
+                address: "127.0.0.1:9000".to_string(),
+            },
+            NodeInfo {
+                name: "node2".to_string(),
+                address: "127.0.0.1:9001".to_string(),
+            },
+            NodeInfo {
+                name: "node3".to_string(),
+                address: "127.0.0.1:9002".to_string(),
+            },
+            NodeInfo {
+                name: "node4".to_string(),
+                address: "127.0.0.1:9003".to_string(),
+            },
+        ],
     };
 
     let _register_response = register(State(app_state.clone()), Json(register_request.clone()))
