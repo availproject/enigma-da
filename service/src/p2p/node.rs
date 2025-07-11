@@ -1,4 +1,3 @@
-use std::{collections::HashMap, time::Duration};
 use crate::db::store::DataStore;
 use crate::p2p::types::{MessageProtocol, MessageRequest, MessageResponse, get_p2p_identifier};
 use keys::keys::{PrivateKeyShare, Verifier};
@@ -12,9 +11,34 @@ use libp2p::{
     swarm::SwarmEvent,
     tcp, yamux,
 };
+use std::fs;
+use std::path::Path;
 use std::{collections::HashMap, time::Duration};
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
+
+/// Load existing keypair from file or generate new one and save it
+fn load_or_generate_keypair(node_name: &str) -> anyhow::Result<libp2p::identity::Keypair> {
+    let key_file = format!("node_key_{}.bin", node_name);
+
+    if Path::new(&key_file).exists() {
+        // Load existing keypair
+        let key_bytes = fs::read(&key_file)?;
+        let keypair = libp2p::identity::Keypair::from_protobuf_encoding(&key_bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to decode keypair: {}", e))?;
+        info!("Loaded existing keypair for node: {}", node_name);
+        Ok(keypair)
+    } else {
+        // Generate new keypair and save it
+        let keypair = libp2p::identity::Keypair::generate_ed25519();
+        let key_bytes = keypair
+            .to_protobuf_encoding()
+            .map_err(|e| anyhow::anyhow!("Failed to encode keypair: {}", e))?;
+        fs::write(&key_file, key_bytes)?;
+        info!("Generated and saved new keypair for node: {}", node_name);
+        Ok(keypair)
+    }
+}
 
 #[derive(NetworkBehaviour)]
 pub struct P2PBehaviour {
@@ -68,8 +92,8 @@ pub enum NodeCommand {
 
 impl NetworkNode {
     pub async fn new(port: u16, node_name: String) -> anyhow::Result<Self> {
-        // Generate identity
-        let local_key = libp2p::identity::Keypair::generate_ed25519();
+        // Try to load existing identity from file, or generate new one
+        let local_key = load_or_generate_keypair(&node_name)?;
         let local_peer_id = PeerId::from(local_key.public());
         info!("Local peer id: {local_peer_id}");
 
@@ -181,7 +205,10 @@ impl NetworkNode {
             );
             return;
         } else {
-            if let Err(e) = self.shard_store.add_shard(&app_id, shard_index, shard) {
+            if let Err(e) =
+                self.shard_store
+                    .add_shard(app_id.parse::<u32>().unwrap(), shard_index, shard)
+            {
                 warn!(
                     "[{}] ❌ Failed to store shard for app_id: {}, shard_index: {}: {}",
                     self.node_name, app_id, shard_index, e
@@ -196,7 +223,10 @@ impl NetworkNode {
     }
 
     fn get_shard(&self, app_id: &str) -> Option<HashMap<u32, String>> {
-        match self.shard_store.get_all_shards(app_id) {
+        match self
+            .shard_store
+            .get_all_shards(app_id.parse::<u32>().unwrap())
+        {
             Ok(shards) => Some(shards),
             Err(e) => {
                 warn!(
@@ -295,6 +325,7 @@ impl NetworkNode {
         );
         Ok(shard)
     }
+
     pub fn verify_shard(&mut self, app_id: &str, shard_index: u32, shard: &str) -> bool {
         info!(
             "[{}] 🔍 Called verify_shard for app_id={}, index={}",
@@ -470,6 +501,7 @@ impl NetworkNode {
                             let response = MessageResponse {
                                 shard: None,
                                 app_id: send_shard.app_id,
+                                job_id: send_shard.job_id,
                                 success: true,
                                 message: "Shard received & Verified and stored successfully"
                                     .to_string(),
@@ -495,45 +527,19 @@ impl NetworkNode {
                                 MessageResponse {
                                     shard: Some(bincode::serialize(&shard_data).unwrap()),
                                     app_id: request_shard.app_id.clone(),
+                                    job_id: request_shard.job_id,
                                     success: true,
                                     message: "Shard found and returned".to_string(),
                                 }
-                            }
-                            MessageRequest::RequestShard(request_shard) => {
-                                info!(
-                                    "[{}] 📥 Shard requested for app_id: {}",
-                                    self.node_name, request_shard.app_id
-                                );
-
-                                let shard = self.get_shard(&request_shard.app_id);
-                                let response = if let Some(shard_data) = shard {
-                                    MessageResponse {
-                                        shard: Some(bincode::serialize(&shard_data).unwrap()),
-                                        app_id: request_shard.app_id.clone(),
-                                        job_id: request_shard.job_id,
-                                        success: true,
-                                        message: "Shard found and returned".to_string(),
-                                    }
-                                } else {
-                                    MessageResponse {
-                                        shard: None,
-                                        app_id: request_shard.app_id.clone(),
-                                        job_id: request_shard.job_id,
-                                        success: false,
-                                        message: "Shard not found".to_string(),
-                                    }
-                                };
-
-                                if let Err(e) = self
-                                    .swarm
-                                    .behaviour_mut()
-                                    .request_response
-                                    .send_response(channel, response)
-                                {
-                                    warn!("Failed to send response: {:?}", e);
+                            } else {
+                                MessageResponse {
+                                    shard: None,
+                                    app_id: request_shard.app_id.clone(),
+                                    job_id: request_shard.job_id,
+                                    success: false,
+                                    message: "Shard not found".to_string(),
                                 }
                             };
-
                             if let Err(e) = self
                                 .swarm
                                 .behaviour_mut()

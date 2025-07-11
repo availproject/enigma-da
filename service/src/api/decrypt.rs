@@ -1,5 +1,5 @@
 use crate::AppState;
-use crate::db::types::{DecryptRequestData, DecryptRequestStatus};
+use crate::db::types::{DecryptRequestData, RequestStatus};
 use crate::error::AppError;
 use crate::handler::worker::JobType;
 use crate::types::{
@@ -37,7 +37,7 @@ pub async fn decrypt(
         ciphertext_array: request.ciphertext.clone(),
         ephemeral_pub_key_array: request.ephemeral_pub_key.clone(),
         job_id,
-        status: DecryptRequestStatus::Pending,
+        status: RequestStatus::Pending,
         decrypted_array: None,
     };
 
@@ -61,7 +61,7 @@ pub async fn decrypt(
         .await
         .get_tx()
         .send(JobType::DecryptJob(
-            request.app_id.to_string(),
+            request.app_id,
             job_id,
             request.ciphertext.clone(),
             request.ephemeral_pub_key.clone(),

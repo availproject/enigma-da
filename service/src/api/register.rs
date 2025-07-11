@@ -1,33 +1,28 @@
 use crate::AppState;
+use crate::db::types::{RegisterAppRequestData, RequestStatus};
 use crate::error::AppError;
-use crate::p2p::node::NodeCommand;
-use crate::types::{RegisterRequest, RegisterResponse};
-use axum::{Json, extract::State, response::IntoResponse};
-use keygen::keygen;
-use keys::keystore::KeyStore;
-use libp2p::PeerId;
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-    process::{Command, Stdio},
-    time::Duration,
+use crate::handler::worker::JobType;
+use crate::types::{
+    GetRegisterAppRequestStatusRequest, GetRegisterAppRequestStatusResponse, RegisterAppRequest,
+    RegisterResponse,
 };
-use tokio::time::sleep;
+use axum::{Json, extract::State, response::IntoResponse};
+use uuid::Uuid;
 
 pub async fn register(
     State(state): State<AppState>,
-    Json(request): Json<RegisterRequest>,
+    Json(request): Json<RegisterAppRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let request_span = tracing::info_span!("register_request", app_id = request.app_id);
     let _guard = request_span.enter();
 
     // Check if app_id is already registered
     match state.data_store.get_public_key(request.app_id) {
-        Ok(existing_key) => {
+        Ok(_) => {
             tracing::warn!(app_id = request.app_id, "App ID already registered");
             return Ok(Json(RegisterResponse {
                 app_id: request.app_id,
-                public_key: existing_key,
+                job_id: Uuid::from_u128(0),
             }));
         }
         Err(e) if e.to_string().contains("Public key not found") => {
@@ -42,72 +37,73 @@ pub async fn register(
         }
     }
 
-    println!("app id not found");
+    let job_id = Uuid::new_v4();
 
-    tracing::debug!("Generating new keypair");
-    let public_key = (keygen(
-        request.k,
-        request.n,
-        "ECIESThreshold",
-        "./conf",
-        true,
-        request.app_id,
-    ))
-    .map_err(|e| AppError::KeyGenerationError(e.to_string()))?;
-    tracing::debug!("Generated keypair successfully");
-
-    for (i, node) in request.nodes.iter().enumerate() {
-        let filename = format!("./conf/node{}.keystore", i + 1);
-        let path = std::path::PathBuf::from(&filename);
-        let keystore = KeyStore::from_file(&path)?;
-
-        let entry = keystore
-            .get_key_by_id(&request.app_id)
-            .map_err(|e| AppError::Other(format!("Failed to read keyentry: {}", e)))?;
-        let sk = entry.sk.ok_or(AppError::KeyNotFound(request.app_id))?;
-        let verifier = entry
-            .verifier
-            .ok_or(AppError::KeyNotFound(request.app_id))?;
-
-        let peer_id = read_peer_id(&node.name)
-            .map_err(|e| AppError::Other(format!("Failed to read peer_id: {}", e)))?;
-        let command_sender = state.network_manager.lock().await.get_command_sender();
-
-        command_sender
-            .send(NodeCommand::SendShard {
-                peer_id: peer_id.to_string(),
-                app_id: request.app_id.to_string(),
-                shard_index: (i + 1) as u32,
-                shard: serde_json::to_string(&(sk, verifier))
-                    .map_err(|e| AppError::Other(format!("Failed to send command: {}", e)))?, // send both as a tuple
-            })
-            .map_err(|e| AppError::Other(format!("Failed to send command: {}", e)))?;
-    }
-    sleep(Duration::from_secs(10)).await;
-
-    // Try to store the keys in the TEE
-    let mock_private_key = vec![0; 32];
-
-    tracing::debug!("Generated keypair successfully");
-
-    if let Err(e) = state
+    state
         .data_store
-        .store_public_key(request.app_id, &public_key)
-    {
-        tracing::error!(error = ?e, "Failed to store keys");
-        return Err(AppError::Database(e.to_string()));
-    }
-    tracing::info!(app_id = request.app_id, "Successfully registered new app");
+        .store_register_app_request(RegisterAppRequestData {
+            app_id: request.app_id.to_string(),
+            job_id,
+            status: RequestStatus::Pending,
+            public_key: None,
+        })
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to store register app request");
+            AppError::Database(e.to_string())
+        })?;
+
+    state
+        .worker_manager
+        .lock()
+        .await
+        .get_tx()
+        .send(JobType::RegisterApp(request.app_id, job_id))
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to send register app request to worker");
+            AppError::Internal(e.to_string())
+        })?;
+
+    tracing::info!(
+        app_id = request.app_id,
+        "Successfully sent register app request"
+    );
 
     Ok(Json(RegisterResponse {
         app_id: request.app_id,
-        public_key: public_key,
+        job_id: job_id,
     }))
 }
-fn read_peer_id(name: &str) -> anyhow::Result<PeerId> {
-    let file = File::open(format!("peer_id_{}.txt", name))?;
-    let reader = BufReader::new(file);
-    let peer_id: String =
-        String::from_utf8(reader.lines().next().unwrap().unwrap().as_bytes().to_vec())?;
-    Ok(peer_id.parse()?)
+
+pub async fn get_register_app_request_status(
+    State(state): State<AppState>,
+    Json(request): Json<GetRegisterAppRequestStatusRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let request_span = tracing::info_span!(
+        "get_register_app_request_status",
+        job_id = request.job_id.to_string()
+    );
+    let _guard = request_span.enter();
+
+    let register_app_request = state
+        .data_store
+        .get_register_app_request(request.job_id)
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to get register app request status");
+            AppError::Database(e.to_string())
+        })?;
+
+    if register_app_request.is_none() {
+        tracing::error!(
+            job_id = request.job_id.to_string(),
+            "Register app request not found"
+        );
+        return Err(AppError::Internal(format!(
+            "Register app request not found for job id: {}",
+            request.job_id
+        )));
+    }
+
+    Ok(Json(GetRegisterAppRequestStatusResponse {
+        request: register_app_request.unwrap(),
+    }))
 }

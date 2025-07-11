@@ -22,7 +22,7 @@ pub mod p2p;
 pub mod tracer;
 pub mod types;
 use crate::{api::get_decrypt_request_status, handler::worker::JobWorker};
-use api::{decrypt, encrypt, quote, reencrypt, register};
+use api::{decrypt, encrypt, get_register_app_request_status, quote, reencrypt, register};
 use db::store::DataStore;
 use network_manager::NetworkManager;
 use tracer::{TracingConfig, init_tracer};
@@ -65,6 +65,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/quote", get(quote))
         .route("/v1/private-key", post(reencrypt))
         .route("/v1/decrypt-status", get(get_decrypt_request_status))
+        .route("/v1/register-status", get(get_register_app_request_status))
         .layer(TraceLayer::new_for_http())
         .with_state(app_state);
 
