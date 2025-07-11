@@ -44,6 +44,7 @@ pub async fn decrypt(
     state
         .data_store
         .store_decrypt_request(request_data)
+        .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to store decrypt request");
             AppError::Database(e.to_string())
@@ -57,15 +58,13 @@ pub async fn decrypt(
     // Send the request to the worker
     state
         .worker_manager
-        .lock()
-        .await
-        .get_tx()
-        .send(JobType::DecryptJob(
+        .send_job(JobType::DecryptJob(
             request.app_id,
             job_id,
             request.ciphertext.clone(),
             request.ephemeral_pub_key.clone(),
         ))
+        .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to send decrypt job to worker");
             AppError::Internal(e.to_string())
@@ -93,6 +92,7 @@ pub async fn get_decrypt_request_status(
     let decrypt_request = state
         .data_store
         .get_decrypt_request(request.job_id)
+        .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to get decrypt request status");
             AppError::Database(e.to_string())

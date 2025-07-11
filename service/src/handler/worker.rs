@@ -1,9 +1,8 @@
-use crate::db::store::DataStore;
 use crate::db::types::DecryptRequestData;
 use crate::db::types::RegisterAppRequestData;
 use crate::db::types::RequestStatus;
-use crate::network_manager::NetworkManager;
 use crate::p2p::node::NodeCommand;
+use crate::traits::{DataStore as DataStoreTrait, NetworkManager as NetworkManagerTrait};
 use ecies::SecretKey;
 use k256::ProjectivePoint;
 use k256::Scalar;
@@ -13,7 +12,6 @@ use lazy_static::lazy_static;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 use vsss_rs_std::{PedersenVerifier, Share};
 
@@ -39,13 +37,16 @@ const SHARD_CLEANUP_INTERVAL_HOURS: u64 = 6; // 6 hours
 pub struct JobWorker {
     tx: mpsc::UnboundedSender<JobType>,
     rx: mpsc::UnboundedReceiver<JobType>,
-    data_store: Arc<DataStore>,
-    network_manager: Arc<Mutex<NetworkManager>>,
+    data_store: Arc<dyn DataStoreTrait + Send + Sync>,
+    network_manager: Arc<dyn NetworkManagerTrait + Send + Sync>,
     retry_count: u32,
 }
 
 impl JobWorker {
-    pub fn new(data_store: Arc<DataStore>, network_manager: Arc<Mutex<NetworkManager>>) -> Self {
+    pub fn new(
+        data_store: Arc<dyn DataStoreTrait + Send + Sync>,
+        network_manager: Arc<dyn NetworkManagerTrait + Send + Sync>,
+    ) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
         Self {
             tx,
@@ -54,6 +55,33 @@ impl JobWorker {
             network_manager,
             retry_count: 0,
         }
+    }
+
+    pub async fn new_with_receiver(
+        mut rx: mpsc::Receiver<JobType>,
+        data_store: Arc<dyn DataStoreTrait + Send + Sync>,
+        network_manager: Arc<dyn NetworkManagerTrait + Send + Sync>,
+        _config: crate::config::ServiceConfig,
+    ) -> Result<Self, anyhow::Error> {
+        let (tx, unbounded_rx) = mpsc::unbounded_channel();
+        let tx_clone = tx.clone();
+
+        // Convert bounded receiver to unbounded receiver by spawning a task
+        tokio::spawn(async move {
+            while let Some(job) = rx.recv().await {
+                if tx_clone.send(job).is_err() {
+                    break;
+                }
+            }
+        });
+
+        Ok(Self {
+            tx,
+            rx: unbounded_rx,
+            data_store,
+            network_manager,
+            retry_count: 0,
+        })
     }
 
     pub fn get_tx(&self) -> mpsc::UnboundedSender<JobType> {
@@ -92,15 +120,17 @@ impl JobWorker {
                                 .handle_register_app_job(app_id, job_id, &peers, n, k)
                                 .await;
                             if let Err(e) = result {
-                                self.data_store.update_register_app_request(
-                                    job_id,
-                                    RegisterAppRequestData {
-                                        app_id: app_id.to_string(),
+                                self.data_store
+                                    .update_register_app_request(
                                         job_id,
-                                        status: RequestStatus::Failed,
-                                        public_key: None,
-                                    },
-                                )?;
+                                        RegisterAppRequestData {
+                                            app_id: app_id.to_string(),
+                                            job_id,
+                                            status: RequestStatus::Failed,
+                                            public_key: None,
+                                        },
+                                    )
+                                    .await?;
                                 tracing::error!("Failed to handle register app job: {}", e);
                             }
                         }
@@ -115,17 +145,19 @@ impl JobWorker {
                                 )
                                 .await;
                             if let Err(e) = result {
-                                self.data_store.update_decrypt_request(
-                                    job_id,
-                                    DecryptRequestData {
-                                        app_id: app_id.to_string(),
+                                self.data_store
+                                    .update_decrypt_request(
                                         job_id,
-                                        status: RequestStatus::Failed,
-                                        ciphertext_array: encrypted_data,
-                                        ephemeral_pub_key_array: ephemeral_pub_key,
-                                        decrypted_array: None,
-                                    },
-                                )?;
+                                        DecryptRequestData {
+                                            app_id: app_id.to_string(),
+                                            job_id,
+                                            status: RequestStatus::Failed,
+                                            ciphertext_array: encrypted_data,
+                                            ephemeral_pub_key_array: ephemeral_pub_key,
+                                            decrypted_array: None,
+                                        },
+                                    )
+                                    .await?;
                                 tracing::error!("Failed to handle decrypt job: {}", e);
                             }
                         }
@@ -163,7 +195,7 @@ impl JobWorker {
             app_id,
             job_id
         );
-        let app_peer_ids = self.data_store.get_app_peer_ids(app_id)?;
+        let app_peer_ids = self.data_store.get_app_peer_ids(app_id).await?;
         if app_peer_ids.is_none() {
             tracing::error!("No peer ids found for app_id: {}. Skipping job.", app_id);
             return Ok(());
@@ -172,8 +204,6 @@ impl JobWorker {
         // Sending request to the peers to get the shard
         for peer_id in peer_ids {
             self.network_manager
-                .lock()
-                .await
                 .send_command(NodeCommand::RequestShard {
                     peer_id: peer_id.clone(),
                     app_id: app_id.to_string(),
@@ -182,13 +212,7 @@ impl JobWorker {
                 .await?;
         }
         // Wait for request to be completed
-        while let Some((pending, _)) = self
-            .network_manager
-            .lock()
-            .await
-            .get_request_status(job_id)
-            .await
-        {
+        while let Some((pending, _)) = self.network_manager.get_request_status(job_id).await {
             if pending == 0 {
                 break;
             }
@@ -209,7 +233,7 @@ impl JobWorker {
         }
 
         // Get the shard from the data store
-        let shards = self.data_store.get_all_shards(app_id)?;
+        let shards = self.data_store.get_all_shards(app_id).await?;
         if shards.is_empty() {
             tracing::error!("No shard found for app_id: {}, job_id: {}", app_id, job_id);
             return Err(anyhow::anyhow!(
@@ -240,17 +264,19 @@ impl JobWorker {
             decrypted_data_vec.push(decrypted_data);
         }
 
-        self.data_store.update_decrypt_request(
-            job_id,
-            DecryptRequestData {
-                app_id: app_id.to_string(),
+        self.data_store
+            .update_decrypt_request(
                 job_id,
-                status: RequestStatus::Completed,
-                ciphertext_array: encrypted_data,
-                ephemeral_pub_key_array: ephemeral_pub_key,
-                decrypted_array: Some(decrypted_data_vec),
-            },
-        )?;
+                DecryptRequestData {
+                    app_id: app_id.to_string(),
+                    job_id,
+                    status: RequestStatus::Completed,
+                    ciphertext_array: encrypted_data,
+                    ephemeral_pub_key_array: ephemeral_pub_key,
+                    decrypted_array: Some(decrypted_data_vec),
+                },
+            )
+            .await?;
 
         Ok(())
     }
@@ -276,15 +302,17 @@ impl JobWorker {
             true,
             app_id,
         )?;
-        self.data_store.store_public_key(app_id, &public_key)?;
-        self.data_store.add_app_peer_ids(app_id, peers.clone())?;
+        self.data_store
+            .store_public_key(app_id, &public_key)
+            .await?;
+        self.data_store
+            .add_app_peer_ids(app_id, peers.clone())
+            .await?;
 
         // read the shards
         let shards = read_shards(app_id)?;
         for (i, peer_id) in peers.iter().enumerate() {
             self.network_manager
-                .lock()
-                .await
                 .send_command(NodeCommand::SendShard {
                     peer_id: peer_id.clone(),
                     app_id: app_id.to_string(),
@@ -296,13 +324,7 @@ impl JobWorker {
         }
 
         // Wait for request to be completed
-        while let Some((pending, _)) = self
-            .network_manager
-            .lock()
-            .await
-            .get_request_status(job_id)
-            .await
-        {
+        while let Some((pending, _)) = self.network_manager.get_request_status(job_id).await {
             if pending == 0 {
                 break;
             }
@@ -322,22 +344,24 @@ impl JobWorker {
             }
         }
 
-        self.data_store.update_register_app_request(
-            job_id,
-            RegisterAppRequestData {
-                app_id: app_id.to_string(),
+        self.data_store
+            .update_register_app_request(
                 job_id,
-                status: RequestStatus::Completed,
-                public_key: Some(public_key),
-            },
-        )?;
+                RegisterAppRequestData {
+                    app_id: app_id.to_string(),
+                    job_id,
+                    status: RequestStatus::Completed,
+                    public_key: Some(public_key),
+                },
+            )
+            .await?;
 
         Ok(())
     }
 
     // Static method for the background cleanup task
     async fn handle_cleanup_shards_static(
-        data_store: &Arc<DataStore>,
+        data_store: &Arc<dyn DataStoreTrait + Send + Sync>,
     ) -> Result<(), anyhow::Error> {
         tracing::info!("Starting cleanup of old shards");
 
@@ -349,16 +373,17 @@ impl JobWorker {
         let cutoff_time = current_time - (SHARD_CLEANUP_INTERVAL_HOURS * 3600); // 6 hours ago
 
         // Get all apps that have stored data
-        let apps = data_store.list_apps()?;
+        let apps = data_store.list_apps().await?;
         let mut total_cleaned = 0;
 
         for app_id in apps {
-            let shards = data_store.get_all_shards(app_id)?;
+            let shards = data_store.get_all_shards(app_id).await?;
             let mut shards_to_remove = Vec::new();
 
             // Check each shard's timestamp
             for (shard_index, _) in &shards {
-                if let Ok(Some(shard_data)) = data_store.get_shard_data(app_id, *shard_index) {
+                if let Ok(Some(shard_data)) = data_store.get_shard_data(app_id, *shard_index).await
+                {
                     if shard_data.time_stamp < cutoff_time {
                         shards_to_remove.push(*shard_index);
                     }
@@ -367,7 +392,7 @@ impl JobWorker {
 
             // Remove old shards
             for shard_index in shards_to_remove {
-                if let Err(e) = data_store.remove_shard(app_id, shard_index) {
+                if let Err(e) = data_store.remove_shard(app_id, shard_index).await {
                     tracing::error!(
                         "Failed to remove old shard for app_id: {}, shard_index: {}: {}",
                         app_id,

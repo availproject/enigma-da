@@ -17,7 +17,7 @@ pub async fn register(
     let _guard = request_span.enter();
 
     // Check if app_id is already registered
-    match state.data_store.get_public_key(request.app_id) {
+    match state.data_store.get_public_key(request.app_id).await {
         Ok(_) => {
             tracing::warn!(app_id = request.app_id, "App ID already registered");
             return Ok(Json(RegisterResponse {
@@ -47,6 +47,7 @@ pub async fn register(
             status: RequestStatus::Pending,
             public_key: None,
         })
+        .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to store register app request");
             AppError::Database(e.to_string())
@@ -54,10 +55,8 @@ pub async fn register(
 
     state
         .worker_manager
-        .lock()
+        .send_job(JobType::RegisterApp(request.app_id, job_id))
         .await
-        .get_tx()
-        .send(JobType::RegisterApp(request.app_id, job_id))
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to send register app request to worker");
             AppError::Internal(e.to_string())
@@ -87,6 +86,7 @@ pub async fn get_register_app_request_status(
     let register_app_request = state
         .data_store
         .get_register_app_request(request.job_id)
+        .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to get register app request status");
             AppError::Database(e.to_string())
