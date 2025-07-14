@@ -21,7 +21,7 @@ pub struct PeerIdData {
     pub peer_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum RequestStatus {
     Pending,
     Completed,

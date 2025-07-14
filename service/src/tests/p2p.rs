@@ -179,7 +179,7 @@ fn read_peer_id(name: &str) -> anyhow::Result<PeerId> {
     Ok(peer_id.parse()?)
 }
 
-fn kill_process(pid: u32) -> anyhow::Result<()> {
+pub fn kill_process(pid: u32) -> anyhow::Result<()> {
     Command::new("kill")
         .arg("-9")
         .arg(pid.to_string())
