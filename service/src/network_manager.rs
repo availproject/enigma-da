@@ -2,6 +2,7 @@ use crate::p2p::node::{NetworkNode, NodeCommand};
 use std::sync::Arc;
 use tokio::sync::{Mutex, mpsc};
 use tracing::{error, info, warn};
+use uuid::Uuid;
 
 pub struct NetworkManager {
     node_handle: Option<tokio::task::JoinHandle<anyhow::Result<()>>>,
@@ -87,6 +88,56 @@ impl NetworkManager {
         self.command_sender
             .send(command)
             .map_err(|e| anyhow::anyhow!("Failed to send command to network node: {}", e))
+    }
+
+    pub async fn get_request_status(&self, job_id: Uuid) -> Option<(usize, usize)> {
+        let (response_sender, response_receiver) = tokio::sync::oneshot::channel();
+
+        let command = NodeCommand::GetRequestStatus {
+            job_id,
+            response_sender,
+        };
+
+        // Send the command
+        if let Err(e) = self.command_sender.send(command) {
+            error!("Failed to send GetRequestStatus command: {:?}", e);
+            return None;
+        }
+
+        // Wait for the response
+        match response_receiver.await {
+            Ok(status) => status,
+            Err(e) => {
+                error!("Failed to receive status response: {:?}", e);
+                None
+            }
+        }
+    }
+
+    pub async fn get_shard(
+        &self,
+        app_id: u32,
+    ) -> Result<std::collections::HashMap<u32, crate::db::types::ShardData>, anyhow::Error> {
+        let (response_sender, response_receiver) = tokio::sync::oneshot::channel();
+
+        let command = NodeCommand::GetShard {
+            app_id: app_id.to_string(),
+            response_sender,
+        };
+
+        // Send the command
+        if let Err(e) = self.command_sender.send(command) {
+            return Err(anyhow::anyhow!("Failed to send GetShard command: {}", e));
+        }
+
+        // Wait for the response
+        match response_receiver.await {
+            Ok(shards) => Ok(shards),
+            Err(e) => {
+                error!("Failed to receive shard response: {:?}", e);
+                Err(anyhow::anyhow!("Failed to receive shard response: {:?}", e))
+            }
+        }
     }
 }
 

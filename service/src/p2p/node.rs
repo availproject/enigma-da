@@ -1,7 +1,7 @@
-use std::{collections::HashMap, time::Duration};
-
-use crate::p2p::store::P2PStore;
+use crate::db::store::DataStore;
+use crate::db::types::ShardData;
 use crate::p2p::types::{MessageProtocol, MessageRequest, MessageResponse, get_p2p_identifier};
+use keys::keys::{PrivateKeyShare, Verifier};
 use libp2p::futures::StreamExt;
 use libp2p::swarm::Config;
 use libp2p::{Multiaddr, Transport, ping};
@@ -12,8 +12,34 @@ use libp2p::{
     swarm::SwarmEvent,
     tcp, yamux,
 };
+use std::fs;
+use std::path::Path;
+use std::{collections::HashMap, time::Duration};
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
+
+/// Load existing keypair from file or generate new one and save it
+fn load_or_generate_keypair(node_name: &str) -> anyhow::Result<libp2p::identity::Keypair> {
+    let key_file = format!("node_key_{}.bin", node_name);
+
+    if Path::new(&key_file).exists() {
+        // Load existing keypair
+        let key_bytes = fs::read(&key_file)?;
+        let keypair = libp2p::identity::Keypair::from_protobuf_encoding(&key_bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to decode keypair: {}", e))?;
+        info!("Loaded existing keypair for node: {}", node_name);
+        Ok(keypair)
+    } else {
+        // Generate new keypair and save it
+        let keypair = libp2p::identity::Keypair::generate_ed25519();
+        let key_bytes = keypair
+            .to_protobuf_encoding()
+            .map_err(|e| anyhow::anyhow!("Failed to encode keypair: {}", e))?;
+        fs::write(&key_file, key_bytes)?;
+        info!("Generated and saved new keypair for node: {}", node_name);
+        Ok(keypair)
+    }
+}
 
 #[derive(NetworkBehaviour)]
 pub struct P2PBehaviour {
@@ -27,8 +53,8 @@ pub struct P2PBehaviour {
 
 pub struct NetworkNode {
     swarm: Swarm<P2PBehaviour>,
-    pending_requests: HashMap<OutboundRequestId, MessageRequest>,
-    shard_store: P2PStore,
+    pending_requests: HashMap<uuid::Uuid, HashMap<OutboundRequestId, MessageRequest>>,
+    shard_store: DataStore,
     pub node_name: String,
     pub local_peer_id: String,
     shutdown_signal: Option<tokio::sync::oneshot::Sender<()>>,
@@ -43,10 +69,12 @@ pub enum NodeCommand {
         app_id: String,
         shard_index: u32,
         shard: String,
+        job_id: uuid::Uuid,
     },
     RequestShard {
         peer_id: String,
         app_id: String,
+        job_id: uuid::Uuid,
     },
     StoreShard {
         app_id: String,
@@ -55,14 +83,19 @@ pub enum NodeCommand {
     },
     GetShard {
         app_id: String,
+        response_sender: tokio::sync::oneshot::Sender<std::collections::HashMap<u32, ShardData>>,
+    },
+    GetRequestStatus {
+        job_id: uuid::Uuid,
+        response_sender: tokio::sync::oneshot::Sender<Option<(usize, usize)>>,
     },
     Shutdown,
 }
 
 impl NetworkNode {
     pub async fn new(port: u16, node_name: String) -> anyhow::Result<Self> {
-        // Generate identity
-        let local_key = libp2p::identity::Keypair::generate_ed25519();
+        // Try to load existing identity from file, or generate new one
+        let local_key = load_or_generate_keypair(&node_name)?;
         let local_peer_id = PeerId::from(local_key.public());
         info!("Local peer id: {local_peer_id}");
 
@@ -141,7 +174,7 @@ impl NetworkNode {
 
         // Initialize P2P store with a database path based on node name
         let db_path = format!("p2p_store_{}_db", node_name);
-        let shard_store = P2PStore::new(&db_path)?;
+        let shard_store = DataStore::new(&db_path)?;
 
         Ok(NetworkNode {
             swarm,
@@ -167,21 +200,35 @@ impl NetworkNode {
     }
 
     fn store_shard(&mut self, app_id: String, shard_index: u32, shard: String) {
-        if let Err(e) = self.shard_store.add_shard(&app_id, shard_index, shard) {
+        if !self.verify_shard(&app_id, shard_index, &shard) {
             warn!(
-                "[{}] ❌ Failed to store shard for app_id: {}, shard_index: {}: {}",
-                self.node_name, app_id, shard_index, e
-            );
-        } else {
-            info!(
-                "[{}] 💾 Stored shard for app_id: {}, shard_index: {}",
+                "[{}] ❌ Shard verification failed — not storing. app_id: {}, shard_index: {}",
                 self.node_name, app_id, shard_index
             );
+            return;
+        } else {
+            if let Err(e) =
+                self.shard_store
+                    .add_shard(app_id.parse::<u32>().unwrap(), shard_index, shard)
+            {
+                warn!(
+                    "[{}] ❌ Failed to store shard for app_id: {}, shard_index: {}: {}",
+                    self.node_name, app_id, shard_index, e
+                );
+            } else {
+                info!(
+                    "[{}] 💾 Stored verified shard for app_id: {}, shard_index: {}",
+                    self.node_name, app_id, shard_index
+                );
+            }
         }
     }
 
-    fn get_shard(&self, app_id: &str) -> Option<HashMap<u32, String>> {
-        match self.shard_store.get_all_shards(app_id) {
+    fn get_shard(&self, app_id: &str) -> Option<HashMap<u32, ShardData>> {
+        match self
+            .shard_store
+            .get_all_shards(app_id.parse::<u32>().unwrap())
+        {
             Ok(shards) => Some(shards),
             Err(e) => {
                 warn!(
@@ -203,6 +250,7 @@ impl NetworkNode {
         app_id: String,
         shard_index: u32,
         shard: String,
+        job_id: uuid::Uuid,
     ) -> anyhow::Result<()> {
         info!(
             "[{}] 🔧 send_shard method called with peer_id: {}, app_id: {}, shard_index: {}",
@@ -213,6 +261,7 @@ impl NetworkNode {
             app_id,
             shard_index,
             shard,
+            job_id,
         });
 
         let request_id = self
@@ -221,7 +270,8 @@ impl NetworkNode {
             .request_response
             .send_request(&peer_id, send_shard.clone());
         debug!("[{}] >>> request_id >>>: {:?}", self.node_name, request_id);
-        self.pending_requests.insert(request_id, send_shard);
+        self.pending_requests
+            .insert(job_id, HashMap::from([(request_id, send_shard)]));
         debug!(
             "[{}] ✅ send_shard method completed successfully",
             self.node_name
@@ -229,14 +279,19 @@ impl NetworkNode {
         Ok(())
     }
 
-    async fn process_request_shard(&mut self, peer_id: &str, app_id: String) -> anyhow::Result<()> {
+    async fn process_request_shard(
+        &mut self,
+        peer_id: &str,
+        app_id: String,
+        job_id: uuid::Uuid,
+    ) -> anyhow::Result<()> {
         info!(
             "[{}] 🔧 request_shard method called with peer_id: {}, app_id: {}",
             self.node_name, peer_id, app_id
         );
         let peer_id: PeerId = peer_id.parse()?;
         let request_shard =
-            MessageRequest::RequestShard(crate::p2p::types::RequestShard { app_id });
+            MessageRequest::RequestShard(crate::p2p::types::RequestShard { app_id, job_id });
 
         let request_id = self
             .swarm
@@ -248,7 +303,8 @@ impl NetworkNode {
             "[{}] 🔧 Request sent with request_id: {:?}",
             self.node_name, request_id
         );
-        self.pending_requests.insert(request_id, request_shard);
+        self.pending_requests
+            .insert(job_id, HashMap::from([(request_id, request_shard)]));
         debug!(
             "[{}] ✅ request_shard method completed successfully",
             self.node_name
@@ -256,20 +312,38 @@ impl NetworkNode {
         Ok(())
     }
 
-    async fn process_get_shard(
-        &mut self,
-        app_id: &str,
-    ) -> anyhow::Result<Option<HashMap<u32, String>>> {
+    // async fn process_get_shard(
+    //     &mut self,
+    //     app_id: &str,
+    // ) -> anyhow::Result<Option<HashMap<u32, ShardData>>> {
+    //     info!(
+    //         "[{}] 🔧 get_shard method called with app_id: {}",
+    //         self.node_name, app_id
+    //     );
+    //     let shard = self.get_shard(app_id);
+    //     debug!(
+    //         "[{}] ✅ get_shard method completed successfully, shard: {:?}",
+    //         self.node_name, shard
+    //     );
+    //     Ok(shard)
+    // }
+
+    pub fn verify_shard(&mut self, app_id: &str, shard_index: u32, shard: &str) -> bool {
         info!(
-            "[{}] 🔧 get_shard method called with app_id: {}",
-            self.node_name, app_id
+            "[{}] 🔍 Called verify_shard for app_id={}, index={}",
+            self.node_name, app_id, shard_index
         );
-        let shard = self.get_shard(app_id);
-        debug!(
-            "[{}] ✅ get_shard method completed successfully, shard: {:?}",
-            self.node_name, shard
-        );
-        Ok(shard)
+
+        let parsed: Result<(PrivateKeyShare, Verifier), _> = serde_json::from_str(shard);
+
+        if let Ok((sk, verifier)) = parsed {
+            let share = sk.get_share();
+            let blind_share = verifier.get_blind_shares();
+            let vset = verifier.get_verifier_set();
+            vset.verify(share, blind_share).is_ok()
+        } else {
+            false
+        }
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
@@ -299,21 +373,31 @@ impl NetworkNode {
                 }
                 command = self.command_receiver.recv() => {
                     match command {
-                        Some(NodeCommand::SendShard { peer_id, app_id, shard_index, shard }) => {
+                        Some(NodeCommand::SendShard { peer_id, app_id, shard_index, shard, job_id }) => {
                             info!("[{}] 🔧 Processing SendShard command", self.node_name);
-                            self.process_send_shard(&peer_id, app_id, shard_index, shard).await?;
+                            self.process_send_shard(&peer_id, app_id, shard_index, shard, job_id).await?;
                         }
-                        Some(NodeCommand::RequestShard { peer_id, app_id }) => {
+                        Some(NodeCommand::RequestShard { peer_id, app_id, job_id }) => {
                             info!("[{}] 🔧 Processing RequestShard command", self.node_name);
-                            self.process_request_shard(&peer_id, app_id).await?;
+                            self.process_request_shard(&peer_id, app_id, job_id).await?;
                         }
                         Some(NodeCommand::StoreShard { app_id, shard_index, shard }) => {
                             info!("[{}] 🔧 Processing StoreShard command", self.node_name);
                             self.store_shard(app_id, shard_index, shard);
                         }
-                        Some(NodeCommand::GetShard { app_id }) => {
+                        Some(NodeCommand::GetShard { app_id, response_sender }) => {
                             info!("[{}] 🔧 Processing GetShard command", self.node_name);
-                            self.process_get_shard(&app_id).await?;
+                            let shards = self.get_shard(&app_id);
+                            if let Err(e) = response_sender.send(shards.unwrap_or_default()) {
+                                warn!("[{}] ❌ Failed to send shard response: {:?}", self.node_name, e);
+                            }
+                        }
+                        Some(NodeCommand::GetRequestStatus { job_id, response_sender }) => {
+                            info!("[{}] 🔧 Processing GetRequestStatus command", self.node_name);
+                            let status = self.get_request_status(job_id);
+                            if let Err(e) = response_sender.send(status) {
+                                warn!("[{}] ❌ Failed to send status response: {:?}", self.node_name, e);
+                            }
                         }
                         Some(NodeCommand::Shutdown) => {
                             info!("[{}] 🛑 Shutdown command received", self.node_name);
@@ -369,11 +453,18 @@ impl NetworkNode {
                     self.node_name, peer, request_id, error
                 );
                 // Remove the failed request from pending_requests
-                if let Some(original_request) = self.pending_requests.remove(&request_id) {
-                    warn!(
-                        "[{}] ❌ Failed request was: {:?}",
-                        self.node_name, original_request
-                    );
+                let mut job_id_to_remove = None;
+                for (job_id, requests) in &mut self.pending_requests {
+                    if requests.contains_key(&request_id) {
+                        requests.remove(&request_id);
+                        if requests.is_empty() {
+                            job_id_to_remove = Some(*job_id);
+                        }
+                        break;
+                    }
+                }
+                if let Some(job_id) = job_id_to_remove {
+                    self.pending_requests.remove(&job_id);
                 }
             }
             P2PBehaviourEvent::RequestResponse(request_response::Event::ResponseSent {
@@ -392,74 +483,73 @@ impl NetworkNode {
                 match message {
                     request_response::Message::Request {
                         request, channel, ..
-                    } => {
-                        match request {
-                            MessageRequest::SendShard(send_shard) => {
-                                info!(
-                                    "[{}] 📨 Received shard for app_id: {}, shard_index: {}, shard: {}",
-                                    self.node_name,
-                                    send_shard.app_id,
-                                    send_shard.shard_index,
-                                    send_shard.shard
-                                );
+                    } => match request {
+                        MessageRequest::SendShard(send_shard) => {
+                            info!(
+                                "[{}] 📨 Received shard for app_id: {}, shard_index: {}, shard: {}",
+                                self.node_name,
+                                send_shard.app_id,
+                                send_shard.shard_index,
+                                send_shard.shard
+                            );
 
-                                // Store the received shard
-                                self.store_shard(
-                                    send_shard.app_id.clone(),
-                                    send_shard.shard_index,
-                                    send_shard.shard.clone(),
-                                );
+                            self.store_shard(
+                                send_shard.app_id.clone(),
+                                send_shard.shard_index,
+                                send_shard.shard.clone(),
+                            );
+                            let response = MessageResponse {
+                                shard: None,
+                                app_id: send_shard.app_id,
+                                job_id: send_shard.job_id,
+                                success: true,
+                                message: "Shard received & Verified and stored successfully"
+                                    .to_string(),
+                            };
 
-                                let response = MessageResponse {
-                                    shard: None,
-                                    app_id: send_shard.app_id.clone(),
-                                    success: true,
-                                    message: "Shard received and stored successfully".to_string(),
-                                };
-
-                                if let Err(e) = self
-                                    .swarm
-                                    .behaviour_mut()
-                                    .request_response
-                                    .send_response(channel, response)
-                                {
-                                    warn!("Failed to send response: {:?}", e);
-                                }
-                            }
-                            MessageRequest::RequestShard(request_shard) => {
-                                info!(
-                                    "[{}] 📥 Shard requested for app_id: {}",
-                                    self.node_name, request_shard.app_id
-                                );
-
-                                let shard = self.get_shard(&request_shard.app_id);
-                                let response = if let Some(shard_data) = shard {
-                                    MessageResponse {
-                                        shard: Some(bincode::serialize(&shard_data).unwrap()),
-                                        app_id: request_shard.app_id.clone(),
-                                        success: true,
-                                        message: "Shard found and returned".to_string(),
-                                    }
-                                } else {
-                                    MessageResponse {
-                                        shard: None,
-                                        app_id: request_shard.app_id.clone(),
-                                        success: false,
-                                        message: "Shard not found".to_string(),
-                                    }
-                                };
-
-                                if let Err(e) = self
-                                    .swarm
-                                    .behaviour_mut()
-                                    .request_response
-                                    .send_response(channel, response)
-                                {
-                                    warn!("Failed to send response: {:?}", e);
-                                }
+                            if let Err(e) = self
+                                .swarm
+                                .behaviour_mut()
+                                .request_response
+                                .send_response(channel, response)
+                            {
+                                warn!("Failed to send response: {:?}", e);
                             }
                         }
-                    }
+                        MessageRequest::RequestShard(request_shard) => {
+                            info!(
+                                "[{}] 📥 Shard requested for app_id: {}",
+                                self.node_name, request_shard.app_id
+                            );
+
+                            let shard = self.get_shard(&request_shard.app_id);
+                            let response = if let Some(shard_data) = shard {
+                                MessageResponse {
+                                    shard: Some(bincode::serialize(&shard_data).unwrap()),
+                                    app_id: request_shard.app_id.clone(),
+                                    job_id: request_shard.job_id,
+                                    success: true,
+                                    message: "Shard found and returned".to_string(),
+                                }
+                            } else {
+                                MessageResponse {
+                                    shard: None,
+                                    app_id: request_shard.app_id.clone(),
+                                    job_id: request_shard.job_id,
+                                    success: false,
+                                    message: "Shard not found".to_string(),
+                                }
+                            };
+                            if let Err(e) = self
+                                .swarm
+                                .behaviour_mut()
+                                .request_response
+                                .send_response(channel, response)
+                            {
+                                warn!("Failed to send response: {:?}", e);
+                            }
+                        }
+                    },
                     request_response::Message::Response {
                         response,
                         request_id,
@@ -469,51 +559,64 @@ impl NetworkNode {
                             "[{}] 🔍 Received response for request_id: {:?}",
                             self.node_name, request_id
                         );
-                        if let Some(original_request) = self.pending_requests.remove(&request_id) {
-                            if response.success {
-                                if let Some(shard) = &response.shard {
-                                    info!(
-                                        "[{}] ✅ Shard received: {:?} (Request: {:?})",
-                                        self.node_name,
-                                        String::from_utf8_lossy(shard),
-                                        original_request
-                                    );
-                                    // Try to deserialize and store the received shard
-                                    match bincode::deserialize::<HashMap<u32, String>>(shard) {
-                                        Ok(shard_data) => {
-                                            // Store each shard in the received data
-                                            for (shard_index, shard_content) in shard_data {
-                                                self.store_shard(
-                                                    response.app_id.clone(),
-                                                    shard_index,
-                                                    shard_content,
-                                                );
-                                            }
-                                        }
-                                        Err(e) => {
-                                            warn!(
-                                                "[{}] ❌ Failed to deserialize shard: {:?}",
-                                                self.node_name, e
+                        info!("[{}] 🔍 Response: {:?}", self.node_name, response);
+                        // Find the job_id that contains this request_id and get the original request
+
+                        if response.success {
+                            if let Some(shard) = &response.shard {
+                                info!(
+                                    "[{}] ✅ Shard received: {:?} (Request: {:?})",
+                                    self.node_name,
+                                    String::from_utf8_lossy(shard),
+                                    response
+                                );
+                                // Try to deserialize and store the received shard
+                                match bincode::deserialize::<HashMap<u32, String>>(shard) {
+                                    Ok(shard_data) => {
+                                        // Store each shard in the received data
+                                        for (shard_index, shard_content) in shard_data {
+                                            self.store_shard(
+                                                response.app_id.clone(),
+                                                shard_index,
+                                                shard_content,
                                             );
                                         }
                                     }
-                                } else {
-                                    info!(
-                                        "[{}] ✅ Response: {} (Request: {:?})",
-                                        self.node_name, response.message, original_request
-                                    );
+
+                                    Err(e) => {
+                                        warn!(
+                                            "[{}] ❌ Failed to deserialize shard: {:?}",
+                                            self.node_name, e
+                                        );
+                                    }
                                 }
                             } else {
                                 info!(
-                                    "[{}] ❌ Request failed: {} (Request: {:?})",
-                                    self.node_name, response.message, original_request
+                                    "[{}] ✅ Response: {} (Response: {:?})",
+                                    self.node_name, response.message, response
                                 );
                             }
                         } else {
-                            warn!(
-                                "[{}] ❌ No pending request found for request_id: {:?}",
-                                self.node_name, request_id
+                            info!(
+                                "[{}] ❌ Request failed: {} (Response: {:?})",
+                                self.node_name, response.message, response
                             );
+                        }
+
+                        // Remove the request from pending_requests after processing
+                        let mut job_id_to_remove: Option<uuid::Uuid> = None;
+                        for (job_id, requests) in &mut self.pending_requests {
+                            if requests.contains_key(&request_id) {
+                                requests.remove(&request_id);
+                                if requests.is_empty() {
+                                    job_id_to_remove = Some(*job_id);
+                                }
+                                break;
+                            }
+                        }
+                        // Remove the job_id entry if all requests for this job are done
+                        if let Some(job_id) = job_id_to_remove {
+                            self.pending_requests.remove(&job_id);
                         }
                     }
                 }
@@ -549,5 +652,14 @@ impl NetworkNode {
 
     pub fn local_peer_id(&self) -> &str {
         &self.local_peer_id
+    }
+
+    pub fn get_request_status(&self, job_id: uuid::Uuid) -> Option<(usize, usize)> {
+        if let Some(requests) = self.pending_requests.get(&job_id) {
+            let total_requests = requests.len();
+            Some((total_requests, 0))
+        } else {
+            None
+        }
     }
 }
