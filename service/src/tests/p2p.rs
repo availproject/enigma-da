@@ -11,6 +11,8 @@ use tokio::{sync::Mutex, time::sleep};
 
 use crate::p2p::node::{NetworkNode, NodeCommand};
 
+const TEST_SHARD: &str = "[[48,129,128,2,1,0,4,123,48,121,2,1,1,4,33,1,196,150,40,136,159,143,117,108,125,163,226,120,71,132,214,204,187,87,206,254,220,131,225,25,98,238,62,171,33,99,255,63,4,81,48,79,2,1,4,2,1,3,4,65,4,179,197,116,13,36,228,122,200,9,13,231,99,203,245,54,217,198,0,60,160,236,237,209,127,30,206,71,183,173,36,132,128,174,47,220,92,7,131,219,131,132,241,234,245,178,181,123,109,35,46,9,87,40,238,143,131,7,5,29,69,237,136,175,160,4,4,0,0,1,65],[48,130,1,79,2,1,0,4,130,1,72,48,130,1,68,2,1,1,4,33,1,249,36,137,75,139,160,97,55,41,179,70,99,199,69,113,75,62,85,2,147,160,114,66,131,15,134,61,243,6,102,252,108,4,130,1,26,3,179,212,96,241,246,110,30,232,40,51,234,177,198,77,223,78,142,195,7,119,126,49,179,172,0,244,243,215,145,122,239,212,2,121,190,102,126,249,220,187,172,85,160,98,149,206,135,11,7,2,155,252,219,45,206,40,217,89,242,129,91,22,248,23,152,100,0,0,0,0,0,0,0,3,2,179,197,116,13,36,228,122,200,9,13,231,99,203,245,54,217,198,0,60,160,236,237,209,127,30,206,71,183,173,36,132,128,3,101,244,101,159,151,58,91,35,186,122,180,225,73,94,78,178,216,110,70,90,243,103,208,199,231,164,95,178,200,46,194,90,3,250,197,31,83,243,105,248,142,229,48,142,16,40,19,16,137,22,37,160,232,83,79,103,211,171,64,112,112,166,49,7,250,100,0,0,0,0,0,0,0,3,3,191,139,188,202,80,156,5,183,164,27,205,212,43,10,113,209,160,44,2,194,168,67,159,168,212,243,26,223,115,121,98,114,3,253,80,248,186,140,102,44,223,21,20,224,85,245,176,231,144,190,148,230,80,141,43,201,48,49,94,193,51,33,12,203,90,3,139,88,17,23,86,171,26,152,133,84,93,7,175,109,143,158,97,114,9,108,97,216,147,106,106,132,191,150,149,187,54,16]]";
+
 #[tokio::test]
 async fn test_p2p_send_shards() -> anyhow::Result<()> {
     // run the network nodes
@@ -49,17 +51,17 @@ async fn test_p2p_send_shards() -> anyhow::Result<()> {
     // send a shard to the node 1
     command_sender.send(NodeCommand::SendShard {
         peer_id: node1_peer_id.to_string(),
-        app_id: "app1".to_string(),
+        app_id: "123".to_string(),
         shard_index: 0,
-        shard: "shard1".to_string(),
+        shard: TEST_SHARD.to_string(),
         job_id,
     })?;
     // send a shard to the node 2
     command_sender.send(NodeCommand::SendShard {
         peer_id: node2_peer_id.to_string(),
-        app_id: "app1".to_string(),
+        app_id: "123".to_string(),
         shard_index: 1,
-        shard: "shard2".to_string(),
+        shard: TEST_SHARD.to_string(),
         job_id,
     })?;
 
@@ -111,17 +113,17 @@ async fn test_p2p_fetch_shards() -> anyhow::Result<()> {
     // send a shard to the node 1
     command_sender.send(NodeCommand::SendShard {
         peer_id: node1_peer_id.to_string(),
-        app_id: "app1".to_string(),
+        app_id: "123".to_string(),
         shard_index: 0,
-        shard: "shard1".to_string(),
+        shard: TEST_SHARD.to_string(),
         job_id,
     })?;
     // send a shard to the node 2
     command_sender.send(NodeCommand::SendShard {
         peer_id: node2_peer_id.to_string(),
-        app_id: "app1".to_string(),
+        app_id: "123".to_string(),
         shard_index: 1,
-        shard: "shard2".to_string(),
+        shard: TEST_SHARD.to_string(),
         job_id,
     })?;
 
@@ -131,12 +133,12 @@ async fn test_p2p_fetch_shards() -> anyhow::Result<()> {
     // fetch the shards from all the nodes for app1
     command_sender.send(NodeCommand::RequestShard {
         peer_id: node1_peer_id.to_string(),
-        app_id: "app1".to_string(),
+        app_id: "123".to_string(),
         job_id,
     })?;
     command_sender.send(NodeCommand::RequestShard {
         peer_id: node2_peer_id.to_string(),
-        app_id: "app1".to_string(),
+        app_id: "123".to_string(),
         job_id,
     })?;
 
