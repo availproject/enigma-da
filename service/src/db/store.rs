@@ -1,6 +1,6 @@
 use crate::db::types::{
     DECRYPT_REQUEST_PREFIX, DecryptRequestData, PEER_ID_PREFIX, PUBLIC_KEY_PREFIX, PeerIdData,
-    SHARD_PREFIX, ShardData,
+    REGISTER_APP_REQUEST_PREFIX, RegisterAppRequestData, SHARD_PREFIX, ShardData,
 };
 use anyhow::Result;
 use sled::Db;
@@ -40,7 +40,7 @@ impl DataStore {
     }
 
     /// Get a specific shard for an app
-    pub fn get_shard(&self, app_id: &str, shard_index: u32) -> Result<Option<String>> {
+    pub fn get_shard(&self, app_id: u32, shard_index: u32) -> Result<Option<String>> {
         let key = format!("{}:{}:{}", SHARD_PREFIX, app_id, shard_index);
         match self.db.get(key.as_bytes())? {
             Some(value) => {
@@ -52,7 +52,7 @@ impl DataStore {
     }
 
     /// Get a specific shard data (including timestamp) for an app
-    pub fn get_shard_data(&self, app_id: &str, shard_index: u32) -> Result<Option<ShardData>> {
+    pub fn get_shard_data(&self, app_id: u32, shard_index: u32) -> Result<Option<ShardData>> {
         let key = format!("{}:{}:{}", SHARD_PREFIX, app_id, shard_index);
         match self.db.get(key.as_bytes())? {
             Some(value) => {
@@ -64,21 +64,21 @@ impl DataStore {
     }
 
     /// Get all shards for an app
-    pub fn get_all_shards(&self, app_id: &str) -> Result<HashMap<u32, String>> {
+    pub fn get_all_shards(&self, app_id: u32) -> Result<HashMap<u32, ShardData>> {
         let mut shards = HashMap::new();
-        let prefix = format!("{}:{}:", SHARD_PREFIX, app_id);
 
-        for result in self.db.scan_prefix(prefix.as_bytes()) {
-            let (_, value) = result?;
-            let shard_data: ShardData = bincode::deserialize(&value)?;
-            shards.insert(shard_data.shard_index, shard_data.shard);
+        for i in 0..4 {
+            let shard = self.get_shard_data(app_id, i as u32)?;
+            if shard.is_some() {
+                shards.insert(i as u32, shard.unwrap());
+            }
         }
 
         Ok(shards)
     }
 
     /// Get peer IDs for an app
-    pub fn get_app_peer_ids(&self, app_id: &str) -> Result<Option<Vec<String>>> {
+    pub fn get_app_peer_ids(&self, app_id: u32) -> Result<Option<Vec<String>>> {
         let key = format!("{}:{}", PEER_ID_PREFIX, app_id);
         match self.db.get(key.as_bytes())? {
             Some(value) => {
@@ -90,7 +90,7 @@ impl DataStore {
     }
 
     /// Add a shard for an app
-    pub fn add_shard(&self, app_id: &str, shard_index: u32, shard: String) -> Result<()> {
+    pub fn add_shard(&self, app_id: u32, shard_index: u32, shard: String) -> Result<()> {
         let key = format!("{}:{}:{}", SHARD_PREFIX, app_id, shard_index);
         let shard_data = ShardData {
             app_id: app_id.to_string(),
@@ -108,7 +108,7 @@ impl DataStore {
     }
 
     /// Add peer IDs for an app
-    pub fn add_app_peer_ids(&self, app_id: &str, peer_ids: Vec<String>) -> Result<()> {
+    pub fn add_app_peer_ids(&self, app_id: u32, peer_ids: Vec<String>) -> Result<()> {
         let key = format!("{}:{}", PEER_ID_PREFIX, app_id);
         let peer_data = PeerIdData {
             app_id: app_id.to_string(),
@@ -121,7 +121,7 @@ impl DataStore {
     }
 
     /// Remove peer IDs for an app
-    pub fn remove_app_peer_ids(&self, app_id: &str) -> Result<()> {
+    pub fn remove_app_peer_ids(&self, app_id: u32) -> Result<()> {
         let key = format!("{}:{}", PEER_ID_PREFIX, app_id);
         self.db.remove(key.as_bytes())?;
         self.db.flush()?;
@@ -129,7 +129,7 @@ impl DataStore {
     }
 
     /// Remove a specific shard
-    pub fn remove_shard(&self, app_id: &str, shard_index: u32) -> Result<()> {
+    pub fn remove_shard(&self, app_id: u32, shard_index: u32) -> Result<()> {
         let key = format!("{}:{}:{}", SHARD_PREFIX, app_id, shard_index);
         self.db.remove(key.as_bytes())?;
         self.db.flush()?;
@@ -137,7 +137,7 @@ impl DataStore {
     }
 
     /// Remove all data for an app (both shards and peer IDs)
-    pub fn remove_app(&self, app_id: &str) -> Result<()> {
+    pub fn remove_app(&self, app_id: u32) -> Result<()> {
         // Remove all shards for this app
         let shard_prefix = format!("{}:{}:", SHARD_PREFIX, app_id);
         for result in self.db.scan_prefix(shard_prefix.as_bytes()) {
@@ -181,15 +181,46 @@ impl DataStore {
         }
     }
 
+    pub fn store_register_app_request(&self, request: RegisterAppRequestData) -> Result<()> {
+        let key = format!("{}:{}", REGISTER_APP_REQUEST_PREFIX, request.job_id);
+        let value = bincode::serialize(&request)?;
+        self.db.insert(key.as_bytes(), value)?;
+        self.db.flush()?;
+        Ok(())
+    }
+
+    pub fn update_register_app_request(
+        &self,
+        job_id: uuid::Uuid,
+        request: RegisterAppRequestData,
+    ) -> Result<()> {
+        let key = format!("{}:{}", REGISTER_APP_REQUEST_PREFIX, job_id);
+        let value = bincode::serialize(&request)?;
+        self.db.insert(key.as_bytes(), value)?;
+        self.db.flush()?;
+        Ok(())
+    }
+
+    pub fn get_register_app_request(
+        &self,
+        job_id: uuid::Uuid,
+    ) -> Result<Option<RegisterAppRequestData>> {
+        let key = format!("{}:{}", REGISTER_APP_REQUEST_PREFIX, job_id);
+        match self.db.get(key.as_bytes())? {
+            Some(value) => Ok(Some(bincode::deserialize(&value)?)),
+            None => Ok(None),
+        }
+    }
+
     /// List all app IDs that have stored data
-    pub fn list_apps(&self) -> Result<Vec<String>> {
+    pub fn list_apps(&self) -> Result<Vec<u32>> {
         let mut apps = std::collections::HashSet::new();
 
         // Get apps from shard data
         for result in self.db.scan_prefix(SHARD_PREFIX.as_bytes()) {
             let (_, value) = result?;
             if let Ok(shard_data) = bincode::deserialize::<ShardData>(&value) {
-                apps.insert(shard_data.app_id);
+                apps.insert(shard_data.app_id.parse::<u32>()?);
             }
         }
 
@@ -197,7 +228,7 @@ impl DataStore {
         for result in self.db.scan_prefix(PEER_ID_PREFIX.as_bytes()) {
             let (_, value) = result?;
             if let Ok(peer_data) = bincode::deserialize::<PeerIdData>(&value) {
-                apps.insert(peer_data.app_id);
+                apps.insert(peer_data.app_id.parse::<u32>()?);
             }
         }
 
