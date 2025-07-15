@@ -226,13 +226,18 @@ impl JobWorker {
         }
 
         let (response_sender, response_receiver) = tokio::sync::oneshot::channel();
-        self.network_manager.send_command(NodeCommand::GetShard {
-            app_id: app_id.to_string(),
-            response_sender,
-        }).await?;
+        self.network_manager
+            .send_command(NodeCommand::GetShard {
+                app_id: app_id.to_string(),
+                response_sender,
+            })
+            .await?;
         let shards = response_receiver.await?;
 
-        let secret_key = convert_shards_to_key(shards.values().map(|shard| shard.shard.clone()).collect(), k)?;
+        let secret_key = convert_shards_to_key(
+            shards.values().map(|shard| shard.shard.clone()).collect(),
+            k,
+        )?;
 
         let mut decrypted_data_vec: Vec<Vec<u8>> = Vec::new();
         for (i, data) in encrypted_data.iter().enumerate() {

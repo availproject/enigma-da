@@ -114,7 +114,10 @@ impl NetworkManager {
         }
     }
 
-    pub async fn get_shard(&self, app_id: u32) -> Result<std::collections::HashMap<u32, crate::db::types::ShardData>, anyhow::Error> {
+    pub async fn get_shard(
+        &self,
+        app_id: u32,
+    ) -> Result<std::collections::HashMap<u32, crate::db::types::ShardData>, anyhow::Error> {
         let (response_sender, response_receiver) = tokio::sync::oneshot::channel();
 
         let command = NodeCommand::GetShard {
