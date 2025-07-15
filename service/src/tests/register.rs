@@ -95,6 +95,17 @@ async fn test_register_request_endpoint() {
         "Public key should not be set initially"
     );
 
+    // Wait for the job to be processed
+    tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
+
+    let stored_job = data_store
+        .get_register_app_request(response.job_id)
+        .await
+        .expect("Failed to retrieve job from database");
+
+    let job_data = stored_job.unwrap();
+    assert_eq!(job_data.status, RequestStatus::Completed);
+
     println!("✅ Job verification completed successfully!");
     println!("   - Job ID: {}", job_data.job_id);
     println!("   - App ID: {}", job_data.app_id);

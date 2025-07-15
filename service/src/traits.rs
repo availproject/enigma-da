@@ -38,7 +38,7 @@ pub trait DataStore: Send + Sync {
     async fn get_all_shards(
         &self,
         app_id: u32,
-    ) -> Result<std::collections::HashMap<u32, String>, AppError>;
+    ) -> Result<std::collections::HashMap<u32, ShardData>, AppError>;
     async fn remove_shard(&self, app_id: u32, shard_index: u32) -> Result<(), AppError>;
     async fn list_apps(&self) -> Result<Vec<u32>, AppError>;
     async fn get_shard_data(

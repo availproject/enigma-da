@@ -1,83 +1,145 @@
-// use crate::AppState;
-// use crate::api::{encrypt, register};
-// use crate::network_manager::NetworkManager;
-// use crate::types::{
-//     DecryptRequest, DecryptResponse, EncryptRequest, EncryptResponse, RegisterRequest,
-//     RegisterResponse,
-// };
-// use crate::{api::decrypt, key_store::KeyStore};
-// use axum::response::IntoResponse;
-// use axum::{Json, extract::State};
-// use http_body_util::BodyExt;
-// use std::sync::Arc;
-// use uuid::Uuid;
+use crate::AppState;
+use crate::api::decrypt;
+use crate::api::{encrypt, register};
+use crate::config::ServiceConfig;
+use crate::db::async_store::AsyncDataStore;
+use crate::db::types::RequestStatus;
+use crate::network::async_manager::AsyncNetworkManager;
+use crate::tests::p2p::{kill_process, run_node};
+use crate::traits::{DataStore, NetworkManager, WorkerManager};
+use crate::types::{
+    DecryptRequest, DecryptResponse, EncryptRequest, EncryptResponse, RegisterAppRequest,
+    RegisterResponse,
+};
+use crate::worker::async_manager::AsyncWorkerManager;
+use axum::response::IntoResponse;
+use axum::{Json, extract::State};
+use http_body_util::BodyExt;
+use std::sync::Arc;
+use uuid::Uuid;
 
-// const TEST_KEYSTORE_DB_DECRYPT_REQUEST: &str = "test_keystore_decrypt_request_db";
+const TEST_KEYSTORE_DB_DECRYPT_REQUEST: &str = "test_keystore_decrypt_request_db";
 
-// #[tokio::test]
-// async fn test_decrypt_request_endpoint() {
-//     //@TODO this test will run when we give shares from the nodes to the decryption service
-//     let _ = tracing_subscriber::fmt()
-//         .with_env_filter("info")
-//         .with_test_writer()
-//         .try_init();
-//     let _ = tracing_subscriber::fmt()
-//         .with_env_filter("debug")
-//         .with_test_writer()
-//         .try_init();
-//     let key_store = Arc::new(KeyStore::new(TEST_KEYSTORE_DB_DECRYPT_REQUEST).unwrap());
+#[tokio::test]
+async fn test_decrypt_request_endpoint() {
+    //@TODO this test will run when we give shares from the nodes to the decryption service
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("debug")
+        .with_test_writer()
+        .try_init();
 
-//     let network_manager = NetworkManager::new(3001, "encryption-service-node".to_string())
-//         .await
-//         .unwrap();
-//     // let network_manager_clone = network_manager.clone();
-//     let app_state = AppState {
-//         key_store,
-//         network_manager,
-//     };
+    // Create configuration
+    let config = ServiceConfig::default();
 
-//     // Register the app
-//     let register_request = RegisterRequest {
-//         app_id: 321,
-//         k: 3,
-//         n: 4,
-//     };
-//     let register_response = register(State(app_state.clone()), Json(register_request.clone()))
-//         .await
-//         .unwrap();
-//     let register_response_body = register_response.into_response().into_body();
-//     let _register_response: RegisterResponse =
-//         serde_json::from_slice(&register_response_body.collect().await.unwrap().to_bytes())
-//             .unwrap();
+    // Initialize async components with trait objects
+    let data_store: Arc<dyn DataStore + Send + Sync> = Arc::new(
+        AsyncDataStore::from_path(TEST_KEYSTORE_DB_DECRYPT_REQUEST)
+            .expect("Failed to create async data store"),
+    );
+    let mut network_manager: Arc<dyn NetworkManager + Send + Sync> = Arc::new(
+        AsyncNetworkManager::from_config(3001, "encryption-service-node".to_string())
+            .await
+            .expect("Failed to create async network manager"),
+    );
+    let mut worker_manager: Arc<dyn WorkerManager + Send + Sync> = Arc::new(
+        AsyncWorkerManager::new(data_store.clone(), network_manager.clone(), &config)
+            .expect("Failed to create async worker manager"),
+    );
 
-//     // Encrypt the plaintext
-//     let encrypt_request = EncryptRequest {
-//         app_id: 321,
-//         plaintext: vec![0; 32],
-//         turbo_da_app_id: Uuid::new_v4(),
-//     };
-//     let encrypt_response = encrypt(State(app_state.clone()), Json(encrypt_request.clone()))
-//         .await
-//         .unwrap();
-//     let encrypt_response_body = encrypt_response.into_response().into_body();
-//     let encrypt_response: EncryptResponse =
-//         serde_json::from_slice(&encrypt_response_body.collect().await.unwrap().to_bytes()).unwrap();
+    let app_state = AppState {
+        config: Arc::new(config),
+        data_store: data_store.clone(),
+        network_manager: network_manager.clone(),
+        worker_manager: worker_manager.clone(),
+    };
 
-//     // Decrypt the ciphertext
-//     let request = DecryptRequest {
-//         app_id: 321,
-//         ciphertext: encrypt_response.ciphertext,
-//         ephemeral_pub_key: encrypt_response.ephemeral_pub_key,
-//         turbo_da_app_id: Uuid::new_v4(),
-//     };
+    // Start P2P nodes
+    let pid1 = run_node("node1", 9000).unwrap();
+    let pid2 = run_node("node2", 9001).unwrap();
+    let pid3 = run_node("node3", 9002).unwrap();
+    let pid4 = run_node("node4", 9003).unwrap();
+    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
-//     let response = decrypt(State(app_state.clone()), Json(request.clone()))
-//         .await
-//         .unwrap();
+    // Register the app
+    let register_request = RegisterAppRequest { app_id: 321 };
+    let register_response = register(State(app_state.clone()), Json(register_request.clone()))
+        .await
+        .unwrap();
+    let register_response_body = register_response.into_response().into_body();
+    let register_response: RegisterResponse =
+        serde_json::from_slice(&register_response_body.collect().await.unwrap().to_bytes())
+            .unwrap();
+    // Wait for the job to be processed
+    tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
+    let stored_job = data_store
+        .get_register_app_request(register_response.job_id)
+        .await
+        .expect("Failed to retrieve job from database");
+    let job_data = stored_job.unwrap();
+    assert_eq!(
+        job_data.status,
+        RequestStatus::Completed,
+        "Job should be completed"
+    );
 
-//     let response_body = response.into_response().into_body();
-//     let response: DecryptResponse =
-//         serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
+    // Encrypt the plaintext
+    let encrypt_request = EncryptRequest {
+        app_id: 321,
+        plaintext: vec![0; 32],
+        turbo_da_app_id: Uuid::new_v4(),
+    };
+    let encrypt_response = encrypt(State(app_state.clone()), Json(encrypt_request.clone()))
+        .await
+        .unwrap();
+    let encrypt_response_body = encrypt_response.into_response().into_body();
+    let encrypt_response: EncryptResponse =
+        serde_json::from_slice(&encrypt_response_body.collect().await.unwrap().to_bytes()).unwrap();
 
-//     assert_eq!(response.plaintext, encrypt_request.plaintext);
-// }
+    // Decrypt the ciphertext - convert single values to arrays as expected by DecryptRequest
+    let request = DecryptRequest {
+        app_id: 321,
+        ciphertext: vec![encrypt_response.ciphertext],
+        ephemeral_pub_key: vec![encrypt_response.ephemeral_pub_key],
+        turbo_da_app_id: Uuid::new_v4(),
+    };
+
+    let response = decrypt(State(app_state.clone()), Json(request.clone()))
+        .await
+        .unwrap();
+
+    let response_body = response.into_response().into_body();
+    let response: DecryptResponse =
+        serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
+
+    // Wait for the job to be processed
+    tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
+
+    let stored_job = data_store
+        .get_decrypt_request(response.job_id)
+        .await
+        .expect("Failed to retrieve job from database");
+    let job_data = stored_job.unwrap();
+    assert_eq!(
+        job_data.status,
+        RequestStatus::Completed,
+        "Job should be completed"
+    );
+
+    // Gracefully shutdown worker and network manager to avoid warnings
+    if let Some(worker) = Arc::get_mut(&mut worker_manager) {
+        let _ = worker.shutdown().await;
+    }
+    if let Some(network) = Arc::get_mut(&mut network_manager) {
+        let _ = network.shutdown().await;
+    }
+
+    // Clean up P2P processes
+    let _ = kill_process(pid1);
+    let _ = kill_process(pid2);
+    let _ = kill_process(pid3);
+    let _ = kill_process(pid4);
+}

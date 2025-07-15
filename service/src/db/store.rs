@@ -64,14 +64,14 @@ impl DataStore {
     }
 
     /// Get all shards for an app
-    pub fn get_all_shards(&self, app_id: u32) -> Result<HashMap<u32, String>> {
+    pub fn get_all_shards(&self, app_id: u32) -> Result<HashMap<u32, ShardData>> {
         let mut shards = HashMap::new();
-        let prefix = format!("{}:{}:", SHARD_PREFIX, app_id);
 
-        for result in self.db.scan_prefix(prefix.as_bytes()) {
-            let (_, value) = result?;
-            let shard_data: ShardData = bincode::deserialize(&value)?;
-            shards.insert(shard_data.shard_index, shard_data.shard);
+        for i in 0..4 {
+            let shard = self.get_shard_data(app_id, i as u32)?;
+            if shard.is_some() {
+                shards.insert(i as u32, shard.unwrap());
+            }
         }
 
         Ok(shards)

@@ -21,8 +21,8 @@ fn test_p2p_store_basic_operations() -> Result<()> {
     // Test getting all shards
     let all_shards = store.get_all_shards(1)?;
     assert_eq!(all_shards.len(), 2);
-    assert_eq!(all_shards.get(&0).unwrap(), "shard0_data");
-    assert_eq!(all_shards.get(&1).unwrap(), "shard1_data");
+    assert_eq!(all_shards.get(&0).unwrap().shard, "shard0_data".to_string());
+    assert_eq!(all_shards.get(&1).unwrap().shard, "shard1_data".to_string());
 
     // Test peer IDs
     store.add_app_peer_ids(1, vec!["peer1".to_string(), "peer2".to_string()])?;

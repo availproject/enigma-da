@@ -113,6 +113,29 @@ impl NetworkManager {
             }
         }
     }
+
+    pub async fn get_shard(&self, app_id: u32) -> Result<std::collections::HashMap<u32, crate::db::types::ShardData>, anyhow::Error> {
+        let (response_sender, response_receiver) = tokio::sync::oneshot::channel();
+
+        let command = NodeCommand::GetShard {
+            app_id: app_id.to_string(),
+            response_sender,
+        };
+
+        // Send the command
+        if let Err(e) = self.command_sender.send(command) {
+            return Err(anyhow::anyhow!("Failed to send GetShard command: {}", e));
+        }
+
+        // Wait for the response
+        match response_receiver.await {
+            Ok(shards) => Ok(shards),
+            Err(e) => {
+                error!("Failed to receive shard response: {:?}", e);
+                Err(anyhow::anyhow!("Failed to receive shard response: {:?}", e))
+            }
+        }
+    }
 }
 
 impl Drop for NetworkManager {

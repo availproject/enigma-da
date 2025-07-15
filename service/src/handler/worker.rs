@@ -4,16 +4,16 @@ use crate::db::types::RequestStatus;
 use crate::p2p::node::NodeCommand;
 use crate::traits::{DataStore as DataStoreTrait, NetworkManager as NetworkManagerTrait};
 use ecies::SecretKey;
-use k256::ProjectivePoint;
 use k256::Scalar;
 use keygen::keygen;
+use keys::keys::PrivateKeyShare;
+use keys::keys::Verifier;
 use keys::keystore::KeyStore;
 use lazy_static::lazy_static;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use vsss_rs_std::{PedersenVerifier, Share};
 
 lazy_static! {
     static ref PEERS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(load_json_array());
@@ -94,21 +94,14 @@ impl JobWorker {
         let n = *N;
         let k = *K;
 
-        // Start the cleanup job as a background task that runs continuously
+        // Start the cleanup job as a background task that runs once
         let data_store_clone = self.data_store.clone();
         let cleanup_task = tokio::spawn(async move {
-            loop {
-                tracing::info!("Starting periodic shard cleanup job");
-                if let Err(e) = Self::handle_cleanup_shards_static(&data_store_clone).await {
-                    tracing::error!("Cleanup job failed: {}", e);
-                }
-
-                // Wait for 6 hours before next cleanup
-                tokio::time::sleep(std::time::Duration::from_secs(
-                    SHARD_CLEANUP_INTERVAL_HOURS * 3600,
-                ))
-                .await;
+            tracing::info!("Starting one-time shard cleanup job");
+            if let Err(e) = Self::handle_cleanup_shards_static(&data_store_clone).await {
+                tracing::error!("Cleanup job failed: {}", e);
             }
+            tracing::info!("Cleanup job completed");
         });
 
         let job_worker: tokio::task::JoinHandle<Result<(), anyhow::Error>> =
@@ -169,10 +162,10 @@ impl JobWorker {
                 Ok(())
             });
 
-        // Wait for either task to complete (though cleanup task runs indefinitely)
+        // Wait for both tasks to complete
         tokio::select! {
             _ = cleanup_task => {
-                tracing::error!("Cleanup task unexpectedly terminated");
+                tracing::info!("Cleanup task completed");
             }
             result = job_worker => {
                 let _ = result?;
@@ -232,18 +225,14 @@ impl JobWorker {
             }
         }
 
-        // Get the shard from the data store
-        let shards = self.data_store.get_all_shards(app_id).await?;
-        if shards.is_empty() {
-            tracing::error!("No shard found for app_id: {}, job_id: {}", app_id, job_id);
-            return Err(anyhow::anyhow!(
-                "No shard found for app_id: {}, job_id: {}",
-                app_id,
-                job_id
-            ));
-        }
+        let (response_sender, response_receiver) = tokio::sync::oneshot::channel();
+        self.network_manager.send_command(NodeCommand::GetShard {
+            app_id: app_id.to_string(),
+            response_sender,
+        }).await?;
+        let shards = response_receiver.await?;
 
-        let secret_key = convert_shards_to_key(shards.values().cloned().collect(), k)?;
+        let secret_key = convert_shards_to_key(shards.values().map(|shard| shard.shard.clone()).collect(), k)?;
 
         let mut decrypted_data_vec: Vec<Vec<u8>> = Vec::new();
         for (i, data) in encrypted_data.iter().enumerate() {
@@ -428,7 +417,7 @@ fn load_json_array() -> Vec<String> {
 fn read_shards(app_id: u32) -> Result<Vec<String>, anyhow::Error> {
     let mut shards = Vec::new();
     for i in 0..*N {
-        let path = format!("./conf/{}/{}.keystore", app_id, i);
+        let path = format!("./conf/{}/node{}.keystore", app_id, i + 1);
         let keystore = KeyStore::from_file(&PathBuf::from(path))?;
         let entry = keystore
             .get_key_by_id(&app_id)
@@ -443,9 +432,8 @@ fn read_shards(app_id: u32) -> Result<Vec<String>, anyhow::Error> {
 fn convert_shards_to_key(shards: Vec<String>, k: u32) -> Result<SecretKey, anyhow::Error> {
     let mut shares = Vec::new();
     for shard in shards.iter().take(k as usize) {
-        let (sk, _): (Share, PedersenVerifier<Scalar, ProjectivePoint>) =
-            serde_json::from_str(shard).map_err(|_| anyhow::anyhow!("Failed to parse shard"))?;
-        shares.push(sk);
+        let parsed: Result<(PrivateKeyShare, Verifier), _> = serde_json::from_str(shard);
+        shares.push(parsed?.0.get_share().clone());
     }
 
     let reconstructed = vsss_rs_std::combine_shares::<Scalar>(&shares)

@@ -126,7 +126,7 @@ impl DataStoreTrait for AsyncDataStore {
     async fn get_all_shards(
         &self,
         app_id: u32,
-    ) -> Result<std::collections::HashMap<u32, String>, AppError> {
+    ) -> Result<std::collections::HashMap<u32, ShardData>, AppError> {
         let store = self.store.lock().await;
         store
             .get_all_shards(app_id)
