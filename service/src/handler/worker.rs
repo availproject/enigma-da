@@ -114,15 +114,12 @@ impl JobWorker {
                                 .await;
                             if let Err(e) = result {
                                 self.data_store
-                                    .update_register_app_request(
+                                    .update_register_app_request(job_id, RegisterAppRequestData {
+                                        app_id: app_id.to_string(),
                                         job_id,
-                                        RegisterAppRequestData {
-                                            app_id: app_id.to_string(),
-                                            job_id,
-                                            status: RequestStatus::Failed,
-                                            public_key: None,
-                                        },
-                                    )
+                                        status: RequestStatus::Failed,
+                                        public_key: None,
+                                    })
                                     .await?;
                                 tracing::error!("Failed to handle register app job: {}", e);
                             }
@@ -139,17 +136,14 @@ impl JobWorker {
                                 .await;
                             if let Err(e) = result {
                                 self.data_store
-                                    .update_decrypt_request(
+                                    .update_decrypt_request(job_id, DecryptRequestData {
+                                        app_id: app_id.to_string(),
                                         job_id,
-                                        DecryptRequestData {
-                                            app_id: app_id.to_string(),
-                                            job_id,
-                                            status: RequestStatus::Failed,
-                                            ciphertext_array: encrypted_data,
-                                            ephemeral_pub_key_array: ephemeral_pub_key,
-                                            decrypted_array: None,
-                                        },
-                                    )
+                                        status: RequestStatus::Failed,
+                                        ciphertext_array: encrypted_data,
+                                        ephemeral_pub_key_array: ephemeral_pub_key,
+                                        decrypted_array: None,
+                                    })
                                     .await?;
                                 tracing::error!("Failed to handle decrypt job: {}", e);
                             }
@@ -259,17 +253,14 @@ impl JobWorker {
         }
 
         self.data_store
-            .update_decrypt_request(
+            .update_decrypt_request(job_id, DecryptRequestData {
+                app_id: app_id.to_string(),
                 job_id,
-                DecryptRequestData {
-                    app_id: app_id.to_string(),
-                    job_id,
-                    status: RequestStatus::Completed,
-                    ciphertext_array: encrypted_data,
-                    ephemeral_pub_key_array: ephemeral_pub_key,
-                    decrypted_array: Some(decrypted_data_vec),
-                },
-            )
+                status: RequestStatus::Completed,
+                ciphertext_array: encrypted_data,
+                ephemeral_pub_key_array: ephemeral_pub_key,
+                decrypted_array: Some(decrypted_data_vec),
+            })
             .await?;
 
         Ok(())
@@ -339,15 +330,12 @@ impl JobWorker {
         }
 
         self.data_store
-            .update_register_app_request(
+            .update_register_app_request(job_id, RegisterAppRequestData {
+                app_id: app_id.to_string(),
                 job_id,
-                RegisterAppRequestData {
-                    app_id: app_id.to_string(),
-                    job_id,
-                    status: RequestStatus::Completed,
-                    public_key: Some(public_key),
-                },
-            )
+                status: RequestStatus::Completed,
+                public_key: Some(public_key),
+            })
             .await?;
 
         Ok(())
