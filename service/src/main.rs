@@ -50,16 +50,20 @@ async fn main() -> anyhow::Result<()> {
 
     // Initialize async components with trait objects
     let data_store: Arc<dyn DataStore + Send + Sync> = Arc::new(
-        AsyncDataStore::from_path(&config.database.path)
+        AsyncDataStore::from_path(&config.database.path, config.clone())
             .expect("Failed to create async data store"),
     );
     let network_manager: Arc<dyn NetworkManager + Send + Sync> = Arc::new(
-        AsyncNetworkManager::from_config(config.p2p.port, config.p2p.node_name.clone())
-            .await
-            .expect("Failed to create async network manager"),
+        AsyncNetworkManager::from_config(
+            config.p2p.port,
+            config.p2p.node_name.clone(),
+            config.clone(),
+        )
+        .await
+        .expect("Failed to create async network manager"),
     );
     let worker_manager: Arc<dyn WorkerManager + Send + Sync> = Arc::new(
-        AsyncWorkerManager::new(data_store.clone(), network_manager.clone(), &config)
+        AsyncWorkerManager::new(data_store.clone(), network_manager.clone(), &config.clone())
             .expect("Failed to create async worker manager"),
     );
 

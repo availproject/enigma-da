@@ -1,3 +1,4 @@
+use crate::config::ServiceConfig;
 use crate::db::store::DataStore;
 use crate::db::types::ShardData;
 use crate::p2p::types::{MessageProtocol, MessageRequest, MessageResponse, get_p2p_identifier};
@@ -93,7 +94,7 @@ pub enum NodeCommand {
 }
 
 impl NetworkNode {
-    pub async fn new(port: u16, node_name: String) -> anyhow::Result<Self> {
+    pub async fn new(port: u16, node_name: String, config: ServiceConfig) -> anyhow::Result<Self> {
         // Try to load existing identity from file, or generate new one
         let local_key = load_or_generate_keypair(&node_name)?;
         let local_peer_id = PeerId::from(local_key.public());
@@ -174,7 +175,7 @@ impl NetworkNode {
 
         // Initialize P2P store with a database path based on node name
         let db_path = format!("p2p_store_{}_db", node_name);
-        let shard_store = DataStore::new(&db_path)?;
+        let shard_store = DataStore::new(&db_path, config)?;
 
         Ok(NetworkNode {
             swarm,

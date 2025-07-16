@@ -1,4 +1,4 @@
-use crate::db::store::DataStore;
+use crate::{config::ServiceConfig, db::store::DataStore};
 use anyhow::Result;
 use tempfile::tempdir;
 
@@ -6,7 +6,7 @@ use tempfile::tempdir;
 fn test_p2p_store_basic_operations() -> Result<()> {
     let temp_dir = tempdir()?;
     let db_path = temp_dir.path().join("test_p2p_store_db");
-    let store = DataStore::new(db_path.to_str().unwrap())?;
+    let store = DataStore::new(db_path.to_str().unwrap(), ServiceConfig::default())?;
 
     // Test adding and getting shards
     store.add_shard(1, 0, "shard0_data".to_string())?;
@@ -55,13 +55,13 @@ fn test_p2p_store_persistence() -> Result<()> {
 
     // Create store and add data
     {
-        let store = DataStore::new(db_path.to_str().unwrap())?;
+        let store = DataStore::new(db_path.to_str().unwrap(), ServiceConfig::default())?;
         store.add_shard(1, 0, "persistent_data".to_string())?;
         store.add_app_peer_ids(1, vec!["peer1".to_string()])?;
     } // Store is dropped here
 
     // Reopen store and verify data persists
-    let store = DataStore::new(db_path.to_str().unwrap())?;
+    let store = DataStore::new(db_path.to_str().unwrap(), ServiceConfig::default())?;
     assert_eq!(store.get_shard(1, 0)?.unwrap(), "persistent_data");
     assert_eq!(store.get_app_peer_ids(1)?.unwrap(), vec!["peer1"]);
 

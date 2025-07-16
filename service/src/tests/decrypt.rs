@@ -37,16 +37,20 @@ async fn test_decrypt_request_endpoint() {
 
     // Initialize async components with trait objects
     let data_store: Arc<dyn DataStore + Send + Sync> = Arc::new(
-        AsyncDataStore::from_path(TEST_KEYSTORE_DB_DECRYPT_REQUEST)
+        AsyncDataStore::from_path(TEST_KEYSTORE_DB_DECRYPT_REQUEST, config.clone())
             .expect("Failed to create async data store"),
     );
     let mut network_manager: Arc<dyn NetworkManager + Send + Sync> = Arc::new(
-        AsyncNetworkManager::from_config(3001, "encryption-service-node".to_string())
-            .await
-            .expect("Failed to create async network manager"),
+        AsyncNetworkManager::from_config(
+            3001,
+            "encryption-service-node".to_string(),
+            config.clone(),
+        )
+        .await
+        .expect("Failed to create async network manager"),
     );
     let mut worker_manager: Arc<dyn WorkerManager + Send + Sync> = Arc::new(
-        AsyncWorkerManager::new(data_store.clone(), network_manager.clone(), &config)
+        AsyncWorkerManager::new(data_store.clone(), network_manager.clone(), &config.clone())
             .expect("Failed to create async worker manager"),
     );
 

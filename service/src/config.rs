@@ -23,6 +23,7 @@ pub struct P2PConfig {
     pub node_name: String,
     pub protocol_name: String,
     pub identify_protocol_version: String,
+    pub number_of_p2p_network_nodes: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,6 +60,10 @@ impl Default for ServiceConfig {
                     .unwrap_or_else(|_| "/enigma-kms-p2p/message/1.0.0".to_string()),
                 identify_protocol_version: env::var("P2P_IDENTIFY_PROTOCOL_VERSION")
                     .unwrap_or_else(|_| "/enigma-encrypted-network/1.0.0".to_string()),
+                number_of_p2p_network_nodes: env::var("NUMBER_OF_P2P_NETWORK_NODES")
+                    .unwrap_or_else(|_| "3".to_string())
+                    .parse()
+                    .unwrap_or(3),
             },
             worker: WorkerConfig {
                 shard_request_interval_secs: env::var("SHARD_REQUEST_INTERVAL_SECS")

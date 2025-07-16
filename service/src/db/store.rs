@@ -1,3 +1,4 @@
+use crate::config::ServiceConfig;
 use crate::db::types::{
     DECRYPT_REQUEST_PREFIX, DecryptRequestData, PEER_ID_PREFIX, PUBLIC_KEY_PREFIX, PeerIdData,
     REGISTER_APP_REQUEST_PREFIX, RegisterAppRequestData, SHARD_PREFIX, ShardData,
@@ -8,12 +9,13 @@ use std::collections::HashMap;
 
 pub struct DataStore {
     db: Db,
+    config: ServiceConfig,
 }
 
 impl DataStore {
-    pub fn new(db_path: &str) -> Result<Self> {
+    pub fn new(db_path: &str, config: ServiceConfig) -> Result<Self> {
         let db = sled::open(db_path)?;
-        Ok(Self { db })
+        Ok(Self { db, config })
     }
 
     pub fn store_public_key(&self, app_id: u32, public_key: &[u8]) -> Result<()> {
@@ -67,7 +69,7 @@ impl DataStore {
     pub fn get_all_shards(&self, app_id: u32) -> Result<HashMap<u32, ShardData>> {
         let mut shards = HashMap::new();
 
-        for i in 0..4 {
+        for i in 0..self.config.p2p.number_of_p2p_network_nodes {
             let shard = self.get_shard_data(app_id, i as u32)?;
             if shard.is_some() {
                 shards.insert(i as u32, shard.unwrap());

@@ -1,4 +1,7 @@
-use crate::p2p::node::{NetworkNode, NodeCommand};
+use crate::{
+    config::ServiceConfig,
+    p2p::node::{NetworkNode, NodeCommand},
+};
 use std::sync::Arc;
 use tokio::sync::{Mutex, mpsc};
 use tracing::{error, info, warn};
@@ -11,11 +14,15 @@ pub struct NetworkManager {
 }
 
 impl NetworkManager {
-    pub async fn new(port: u16, node_name: String) -> anyhow::Result<Arc<Mutex<Self>>> {
+    pub async fn new(
+        port: u16,
+        node_name: String,
+        config: ServiceConfig,
+    ) -> anyhow::Result<Arc<Mutex<Self>>> {
         info!("Initializing network manager for node: {}", node_name);
 
         // Create the network node
-        let mut network_node = NetworkNode::new(port, node_name.clone()).await?;
+        let mut network_node = NetworkNode::new(port, node_name.clone(), config).await?;
         let command_sender = network_node.get_command_sender();
 
         // Create shutdown channel

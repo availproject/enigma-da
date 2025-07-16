@@ -1,3 +1,4 @@
+use crate::config::ServiceConfig;
 use crate::db::store::DataStore as SyncDataStore;
 use crate::db::types::{DecryptRequestData, RegisterAppRequestData, ShardData};
 use crate::error::AppError;
@@ -18,8 +19,8 @@ impl AsyncDataStore {
         }
     }
 
-    pub fn from_path(db_path: &str) -> Result<Self, AppError> {
-        let store = SyncDataStore::new(db_path)
+    pub fn from_path(db_path: &str, config: ServiceConfig) -> Result<Self, AppError> {
+        let store = SyncDataStore::new(db_path, config)
             .map_err(|e| AppError::Database(format!("Failed to create data store: {}", e)))?;
         Ok(Self::new(store))
     }

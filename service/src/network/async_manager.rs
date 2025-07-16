@@ -1,3 +1,4 @@
+use crate::config::ServiceConfig;
 use crate::error::AppError;
 use crate::network_manager::NetworkManager as SyncNetworkManager;
 use crate::p2p::node::NodeCommand;
@@ -18,8 +19,12 @@ impl AsyncNetworkManager {
         }
     }
 
-    pub async fn from_config(port: u16, node_name: String) -> Result<Self, AppError> {
-        let manager = SyncNetworkManager::new(port, node_name)
+    pub async fn from_config(
+        port: u16,
+        node_name: String,
+        config: ServiceConfig,
+    ) -> Result<Self, AppError> {
+        let manager = SyncNetworkManager::new(port, node_name, config)
             .await
             .map_err(|e| AppError::Network(format!("Failed to create network manager: {}", e)))?;
         Ok(Self { manager })
