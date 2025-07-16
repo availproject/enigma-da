@@ -350,6 +350,8 @@ impl JobWorker {
             )
             .await?;
 
+        delete_shards(app_id)?;
+
         Ok(())
     }
 
@@ -452,4 +454,12 @@ fn convert_shards_to_key(shards: Vec<String>, k: u32) -> Result<SecretKey, anyho
 
     Ok(ecies::SecretKey::parse(&scalar_bytes)
         .map_err(|_| anyhow::anyhow!("Failed to reconstruct ECIES SecretKey from scalar"))?)
+}
+
+fn delete_shards(app_id: u32) -> Result<(), anyhow::Error> {
+    for i in 0..*N {
+        let path = format!("./conf/{}/node{}.keystore", app_id, i + 1);
+        let _ = fs::remove_file(path);
+    }
+    Ok(())
 }
