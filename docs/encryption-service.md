@@ -17,7 +17,7 @@ Enigma's encryption service is a service that takes requests from turbo DA for e
 
 ### Registration Flow
 
-![Registration Flow](./registration-flow.png)
+![Registration Flow](./register-flow.png)
 
 1. The API receives a registration request from turbo DA.
 2. The API sends a message to worker handler to register the app with details and returns a job ID.
