@@ -1,27 +1,31 @@
+use crate::AppState;
+use crate::db::types::{RegisterAppRequestData, RequestStatus};
 use crate::error::AppError;
-use crate::key_store::KeyStore;
-use crate::types::{RegisterRequest, RegisterResponse};
+use crate::handler::worker::JobType;
+use crate::types::{
+    GetRegisterAppRequestStatusRequest, GetRegisterAppRequestStatusResponse, RegisterAppRequest,
+    RegisterResponse,
+};
 use axum::{Json, extract::State, response::IntoResponse};
-use keygen::keygen;
-use std::sync::Arc;
+use uuid::Uuid;
 
 pub async fn register(
-    State(key_store): State<Arc<KeyStore>>,
-    Json(request): Json<RegisterRequest>,
+    State(state): State<AppState>,
+    Json(request): Json<RegisterAppRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let request_span = tracing::info_span!("register_request", app_id = request.app_id);
     let _guard = request_span.enter();
 
     // Check if app_id is already registered
-    match key_store.get_public_key(request.app_id) {
-        Ok(existing_key) => {
+    match state.data_store.get_public_key(request.app_id).await {
+        Ok(_) => {
             tracing::warn!(app_id = request.app_id, "App ID already registered");
             return Ok(Json(RegisterResponse {
                 app_id: request.app_id,
-                public_key: existing_key,
+                job_id: Uuid::from_u128(0),
             }));
         }
-        Err(AppError::KeyNotFound(_)) => {
+        Err(e) if e.to_string().contains("Public key not found") => {
             tracing::info!(
                 app_id = request.app_id,
                 "App ID not found, proceeding with registration"
@@ -29,39 +33,77 @@ pub async fn register(
         }
         Err(e) => {
             tracing::error!(error = ?e, "Database error during public key lookup");
-            return Err(e);
+            return Err(AppError::Database(e.to_string()));
         }
     }
 
-    println!("app id not found");
+    let job_id = Uuid::new_v4();
 
-    tracing::debug!("Generating new keypair");
-    let public_key = (keygen(
-        request.k,
-        request.n,
-        "ECIESThreshold",
-        "./conf",
-        true,
-        request.app_id,
-    ))
-    .map_err(|e| AppError::KeyGenerationError(e.to_string()))?;
+    state
+        .data_store
+        .store_register_app_request(RegisterAppRequestData {
+            app_id: request.app_id.to_string(),
+            job_id,
+            status: RequestStatus::Pending,
+            public_key: None,
+        })
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to store register app request");
+            AppError::Database(e.to_string())
+        })?;
 
-    // let (private_key, public_key) = ecies::utils::generate_keypair();
+    state
+        .worker_manager
+        .send_job(JobType::RegisterApp(request.app_id, job_id))
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to send register app request to worker");
+            AppError::Internal(e.to_string())
+        })?;
 
-    tracing::debug!("Generated keypair successfully");
-
-    // let _ = key_store.store_keys(request.app_id, &public_key.serialize(), &private_key.serialize());
-    // Try to store the keys in the TEE
-    let mock_private_key = vec![0; 32];
-
-    if let Err(e) = key_store.store_keys(request.app_id, &public_key, &mock_private_key) {
-        tracing::error!(error = ?e, "Failed to store keys");
-        return Err(e);
-    }
-    tracing::info!(app_id = request.app_id, "Successfully registered new app");
+    tracing::info!(
+        app_id = request.app_id,
+        "Successfully sent register app request"
+    );
 
     Ok(Json(RegisterResponse {
         app_id: request.app_id,
-        public_key: public_key,
+        job_id: job_id,
+    }))
+}
+
+pub async fn get_register_app_request_status(
+    State(state): State<AppState>,
+    Json(request): Json<GetRegisterAppRequestStatusRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let request_span = tracing::info_span!(
+        "get_register_app_request_status",
+        job_id = request.job_id.to_string()
+    );
+    let _guard = request_span.enter();
+
+    let register_app_request = state
+        .data_store
+        .get_register_app_request(request.job_id)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to get register app request status");
+            AppError::Database(e.to_string())
+        })?;
+
+    if register_app_request.is_none() {
+        tracing::error!(
+            job_id = request.job_id.to_string(),
+            "Register app request not found"
+        );
+        return Err(AppError::RegisterAppRequestNotFound(format!(
+            "Register app request not found for job id: {}",
+            request.job_id
+        )));
+    }
+
+    Ok(Json(GetRegisterAppRequestStatusResponse {
+        request: register_app_request.unwrap(),
     }))
 }

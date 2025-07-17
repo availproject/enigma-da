@@ -1,17 +1,46 @@
-
 [workspace]
 members = [
     "keygen",
     "keys",
     "proto", 
     "service"]
+exclude = ["enigma-kms-node"]
 resolver = "2"
 
 [workspace.dependencies]
-# Common versions used across packages
 tokio = { version = "1.36", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde_bytes = "0.11"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dstack-sdk = { git = "https://github.com/Dstack-TEE/dstack.git", package = "dstack-sdk" }
+tiny-keccak = "2.0.2"
+alloy = { version = "0.15", default-features = false }
+alloy-primitives = "1.1.2"
+sled = "0.34"
+rstest = "0.20.0"
+http-body-util = "0.1.0"
+tempfile = "3.8"
+async-trait = "0.1"
+libp2p = { version = "0.53", features = [
+    "tcp",
+    "noise",
+    "yamux",
+    "gossipsub",
+    "mdns",
+    "request-response",
+    "identify",
+    "kad",
+    "macros",
+    "tokio",
+    "ping",
+] }
+lazy_static = "1.4"
+anyhow = "1.0.98"
+bincode = "1.3.3"
 rand = "0.8"
 thiserror = "1.0.49"
 base64 = "0.21.5"

@@ -4,6 +4,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde::Serialize;
+use std::io;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -18,12 +19,26 @@ pub enum AppError {
     KeyGenerationError(String),
     #[error("Key not found for app_id: {0}")]
     KeyNotFound(u32),
+    #[error("Decrypt request not found: {0}")]
+    DecryptRequestNotFound(String),
+    #[error("Register app request not found: {0}")]
+    RegisterAppRequestNotFound(String),
     #[error("Database error: {0}")]
     Database(String),
     #[error("Quote retrieval failed: {0}")]
     QuoteGenerationFailed(String),
     #[error("Decryption failed invalid input: {0}")]
     InvalidInput(String),
+    #[error("Unexpected error: {0}")]
+    Other(String),
+    #[error("I/O error: {0}")]
+    Io(#[from] io::Error),
+    #[error("Internal error: {0}")]
+    Internal(String),
+    #[error("Network error: {0}")]
+    Network(String),
+    #[error("Worker error: {0}")]
+    Worker(String),
 }
 
 #[derive(Serialize)]
@@ -41,11 +56,18 @@ impl IntoResponse for AppError {
                 (StatusCode::INTERNAL_SERVER_ERROR, self.to_string())
             }
             AppError::KeyNotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
+            AppError::DecryptRequestNotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
+            AppError::RegisterAppRequestNotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
             AppError::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             AppError::QuoteGenerationFailed(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, self.to_string())
             }
             AppError::InvalidInput(_) => (StatusCode::BAD_REQUEST, self.to_string()),
+            AppError::Other(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            AppError::Io(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            AppError::Network(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            AppError::Worker(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
 
         (status, Json(ErrorResponse { error: message })).into_response()

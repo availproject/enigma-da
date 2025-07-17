@@ -3,7 +3,7 @@ use asn1::ParseError;
 use ecies::PublicKey;
 use k256::ProjectivePoint;
 use k256::Scalar;
-use k256::ecdsa::signature::Verifier;
+// use k256::ecdsa::signature::Verifier;
 use vsss_rs_std::PedersenVerifier;
 use vsss_rs_std::Share;
 
