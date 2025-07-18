@@ -1,4 +1,6 @@
-use crate::db::types::{DecryptRequestData, RegisterAppRequestData, ShardData};
+use crate::db::types::{
+    DecryptRequestData, ReencryptRequestData, RegisterAppRequestData, ShardData,
+};
 use crate::error::AppError;
 use async_trait::async_trait;
 use uuid::Uuid;
@@ -30,6 +32,16 @@ pub trait DataStore: Send + Sync {
         &self,
         job_id: Uuid,
     ) -> Result<Option<RegisterAppRequestData>, AppError>;
+    async fn store_reencrypt_request(&self, request: ReencryptRequestData) -> Result<(), AppError>;
+    async fn update_reencrypt_request(
+        &self,
+        job_id: Uuid,
+        request: ReencryptRequestData,
+    ) -> Result<(), AppError>;
+    async fn get_reencrypt_request(
+        &self,
+        job_id: Uuid,
+    ) -> Result<Option<ReencryptRequestData>, AppError>;
     async fn get_app_peer_ids(&self, app_id: u32) -> Result<Option<Vec<String>>, AppError>;
     async fn add_app_peer_ids(&self, app_id: u32, peer_ids: Vec<String>) -> Result<(), AppError>;
     async fn add_shard(&self, app_id: u32, shard_index: u32, shard: String)

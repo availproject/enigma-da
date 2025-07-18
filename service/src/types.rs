@@ -3,7 +3,7 @@ use dstack_sdk::dstack_client::GetQuoteResponse;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::db::types::{DecryptRequestData, RegisterAppRequestData};
+use crate::db::types::{DecryptRequestData, ReencryptRequestData, RegisterAppRequestData};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct EncryptRequest {
@@ -21,7 +21,7 @@ pub struct EncryptResponse {
     pub ephemeral_pub_key: Vec<u8>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct PrivateKeyRequest {
     pub app_id: u32,
     pub public_key: Vec<u8>,
@@ -29,8 +29,17 @@ pub struct PrivateKeyRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PrivateKeyResponse {
-    pub ephemeral_pub_key: Vec<u8>,
-    pub ciphertext: Vec<u8>,
+    pub job_id: Uuid,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GetReencryptRequestStatusRequest {
+    pub job_id: Uuid,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GetReencryptRequestStatusResponse {
+    pub request: ReencryptRequestData,
 }
 
 #[derive(Serialize)]

@@ -6,6 +6,7 @@ pub const PEER_ID_PREFIX: &str = "peer:";
 pub const PUBLIC_KEY_PREFIX: &str = "pub:";
 pub const DECRYPT_REQUEST_PREFIX: &str = "decrypt_request:";
 pub const REGISTER_APP_REQUEST_PREFIX: &str = "register_app_request:";
+pub const REENCRYPT_REQUEST_PREFIX: &str = "reencrypt_request:";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShardData {
@@ -44,4 +45,13 @@ pub struct RegisterAppRequestData {
     pub job_id: uuid::Uuid,
     pub status: RequestStatus,
     pub public_key: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReencryptRequestData {
+    pub app_id: String,
+    pub job_id: uuid::Uuid,
+    pub status: RequestStatus,
+    pub ephemeral_pub_key: Option<Vec<u8>>,
+    pub private_key_ciphertext: Option<Vec<u8>>,
 }

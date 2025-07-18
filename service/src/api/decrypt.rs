@@ -103,7 +103,7 @@ pub async fn get_decrypt_request_status(
             job_id = request.job_id.to_string(),
             "Decrypt request not found"
         );
-        return Err(AppError::DecryptRequestNotFound(format!(
+        return Err(AppError::RequestNotFound(format!(
             "Decrypt request not found for job id: {}",
             request.job_id.to_string()
         )));

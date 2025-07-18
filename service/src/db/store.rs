@@ -1,7 +1,8 @@
 use crate::config::ServiceConfig;
 use crate::db::types::{
     DECRYPT_REQUEST_PREFIX, DecryptRequestData, PEER_ID_PREFIX, PUBLIC_KEY_PREFIX, PeerIdData,
-    REGISTER_APP_REQUEST_PREFIX, RegisterAppRequestData, SHARD_PREFIX, ShardData,
+    REENCRYPT_REQUEST_PREFIX, REGISTER_APP_REQUEST_PREFIX, ReencryptRequestData,
+    RegisterAppRequestData, SHARD_PREFIX, ShardData,
 };
 use anyhow::Result;
 use sled::Db;
@@ -208,6 +209,37 @@ impl DataStore {
         job_id: uuid::Uuid,
     ) -> Result<Option<RegisterAppRequestData>> {
         let key = format!("{}:{}", REGISTER_APP_REQUEST_PREFIX, job_id);
+        match self.db.get(key.as_bytes())? {
+            Some(value) => Ok(Some(bincode::deserialize(&value)?)),
+            None => Ok(None),
+        }
+    }
+
+    pub fn store_reencrypt_request(&self, request: ReencryptRequestData) -> Result<()> {
+        let key = format!("{}:{}", REENCRYPT_REQUEST_PREFIX, request.job_id);
+        let value = bincode::serialize(&request)?;
+        self.db.insert(key.as_bytes(), value)?;
+        self.db.flush()?;
+        Ok(())
+    }
+
+    pub fn update_reencrypt_request(
+        &self,
+        job_id: uuid::Uuid,
+        request: ReencryptRequestData,
+    ) -> Result<()> {
+        let key = format!("{}:{}", REENCRYPT_REQUEST_PREFIX, job_id);
+        let value = bincode::serialize(&request)?;
+        self.db.insert(key.as_bytes(), value)?;
+        self.db.flush()?;
+        Ok(())
+    }
+
+    pub fn get_reencrypt_request(
+        &self,
+        job_id: uuid::Uuid,
+    ) -> Result<Option<ReencryptRequestData>> {
+        let key = format!("{}:{}", REENCRYPT_REQUEST_PREFIX, job_id);
         match self.db.get(key.as_bytes())? {
             Some(value) => Ok(Some(bincode::deserialize(&value)?)),
             None => Ok(None),

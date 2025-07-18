@@ -8,6 +8,7 @@ pub use decrypt::decrypt;
 pub use decrypt::get_decrypt_request_status;
 pub use encrypt::encrypt;
 pub use quote::quote;
+pub use reencrypt::get_reencrypt_request_status;
 pub use reencrypt::reencrypt;
 pub use register::get_register_app_request_status;
 pub use register::register;

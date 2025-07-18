@@ -97,7 +97,7 @@ pub async fn get_register_app_request_status(
             job_id = request.job_id.to_string(),
             "Register app request not found"
         );
-        return Err(AppError::RegisterAppRequestNotFound(format!(
+        return Err(AppError::RequestNotFound(format!(
             "Register app request not found for job id: {}",
             request.job_id
         )));

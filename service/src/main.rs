@@ -6,8 +6,8 @@ use std::sync::Arc;
 use tower_http::trace::TraceLayer;
 
 use crate::api::{
-    decrypt, encrypt, get_decrypt_request_status, get_register_app_request_status, quote,
-    reencrypt, register,
+    decrypt, encrypt, get_decrypt_request_status, get_reencrypt_request_status,
+    get_register_app_request_status, quote, reencrypt, register,
 };
 use crate::config::ServiceConfig;
 use crate::db::async_store::AsyncDataStore;
@@ -84,6 +84,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/private-key", post(reencrypt))
         .route("/v1/decrypt-status", get(get_decrypt_request_status))
         .route("/v1/register-status", get(get_register_app_request_status))
+        .route("/v1/private-key-status", get(get_reencrypt_request_status))
         .layer(TraceLayer::new_for_http())
         .with_state(app_state);
 

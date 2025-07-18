@@ -1,4 +1,7 @@
 use crate::AppState;
+use crate::db::types::{ReencryptRequestData, RequestStatus};
+use crate::handler::worker::JobType;
+use crate::types::{GetReencryptRequestStatusRequest, GetReencryptRequestStatusResponse};
 use crate::{
     error::AppError,
     types::{PrivateKeyRequest, PrivateKeyResponse},
@@ -6,7 +9,7 @@ use crate::{
 use axum::{Json, extract::State, response::IntoResponse};
 
 pub async fn reencrypt(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(request): Json<PrivateKeyRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let request_span = tracing::info_span!(
@@ -16,43 +19,78 @@ pub async fn reencrypt(
     );
     let _guard = request_span.enter();
 
-    tracing::debug!("Retrieving private key for app id: {}", request.app_id);
-    let private_key = [0; 32];
+    if request.public_key.is_empty() {
+        return Err(AppError::InvalidInput("Public key cannot be empty".into()));
+    }
 
-    // TODO : update the flow here
-    // let private_key = state
-    //     .data_store
-    //     .get_private_key(request.app_id)
-    //     .map_err(|e| {
-    //         tracing::error!(error = %e, "Failed to retrieve private key");
-    //         AppError::KeyNotFound(request.app_id)
-    //     })?;
+    let job_id = uuid::Uuid::new_v4();
+    let request_data = ReencryptRequestData {
+        app_id: request.app_id.to_string(),
+        job_id,
+        status: RequestStatus::Pending,
+        ephemeral_pub_key: None,
+        private_key_ciphertext: None,
+    };
 
-    tracing::debug!("Encrypting private key");
-    let (ephemeral_pub_key, ciphertext) = encrypt_private_key(&private_key, &request.public_key)?;
+    state
+        .data_store
+        .store_reencrypt_request(request_data)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to store reencrypt request");
+            AppError::Database(e.to_string())
+        })?;
+
+    state
+        .worker_manager
+        .send_job(JobType::ReencryptJob(
+            request.app_id,
+            job_id,
+            request.public_key,
+        ))
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to send reencrypt job to worker");
+            AppError::Internal(e.to_string())
+        })?;
 
     tracing::info!(
         app_id = request.app_id,
-        "Successfully retrieved and encrypted private key"
+        job_id = job_id.to_string(),
+        "Successfully sent reencrypt job to worker"
     );
 
-    Ok(Json(PrivateKeyResponse {
-        ephemeral_pub_key: ephemeral_pub_key.to_vec(),
-        ciphertext: ciphertext.to_vec(),
-    }))
+    Ok(Json(PrivateKeyResponse { job_id }))
 }
 
-pub fn encrypt_private_key(
-    private_key: &[u8],
-    public_key: &[u8],
-) -> Result<(Vec<u8>, Vec<u8>), AppError> {
-    let encrypted_private_key = ecies::encrypt(public_key, private_key).map_err(|e| {
-        tracing::error!(error = %e, "Failed to encrypt private key");
-        AppError::EncryptionError(e.to_string())
-    })?;
+pub async fn get_reencrypt_request_status(
+    State(state): State<AppState>,
+    Json(request): Json<GetReencryptRequestStatusRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let request_span = tracing::info_span!(
+        "get_reencrypt_request_status",
+        job_id = request.job_id.to_string(),
+    );
+    let _guard = request_span.enter();
 
-    let key_size = ecies::config::get_ephemeral_key_size();
-    let (ephemeral_pub_key, ciphertext) = encrypted_private_key.split_at(key_size);
+    let reencrypt_request = state
+        .data_store
+        .get_reencrypt_request(request.job_id)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to get reencrypt request");
+            AppError::Database(e.to_string())
+        })?;
 
-    Ok((ephemeral_pub_key.to_vec(), ciphertext.to_vec()))
+    if reencrypt_request.is_none() {
+        return Err(AppError::RequestNotFound(
+            "Reencrypt request not found".into(),
+        ));
+    }
+
+    let reencrypt_request = reencrypt_request.unwrap();
+
+    Ok(Json(GetReencryptRequestStatusResponse {
+        request: reencrypt_request,
+    }))
 }

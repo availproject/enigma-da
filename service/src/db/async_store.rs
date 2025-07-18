@@ -1,6 +1,8 @@
 use crate::config::ServiceConfig;
 use crate::db::store::DataStore as SyncDataStore;
-use crate::db::types::{DecryptRequestData, RegisterAppRequestData, ShardData};
+use crate::db::types::{
+    DecryptRequestData, ReencryptRequestData, RegisterAppRequestData, ShardData,
+};
 use crate::error::AppError;
 use crate::traits::DataStore as DataStoreTrait;
 use async_trait::async_trait;
@@ -94,6 +96,31 @@ impl DataStoreTrait for AsyncDataStore {
         store
             .get_register_app_request(job_id)
             .map_err(|e| AppError::Database(format!("Failed to get register app request: {}", e)))
+    }
+    async fn store_reencrypt_request(&self, request: ReencryptRequestData) -> Result<(), AppError> {
+        let store = self.store.lock().await;
+        store
+            .store_reencrypt_request(request)
+            .map_err(|e| AppError::Database(format!("Failed to store reencrypt request: {}", e)))
+    }
+    async fn update_reencrypt_request(
+        &self,
+        job_id: Uuid,
+        request: ReencryptRequestData,
+    ) -> Result<(), AppError> {
+        let store = self.store.lock().await;
+        store
+            .update_reencrypt_request(job_id, request)
+            .map_err(|e| AppError::Database(format!("Failed to update reencrypt request: {}", e)))
+    }
+    async fn get_reencrypt_request(
+        &self,
+        job_id: Uuid,
+    ) -> Result<Option<ReencryptRequestData>, AppError> {
+        let store = self.store.lock().await;
+        store
+            .get_reencrypt_request(job_id)
+            .map_err(|e| AppError::Database(format!("Failed to get reencrypt request: {}", e)))
     }
     async fn get_app_peer_ids(&self, app_id: u32) -> Result<Option<Vec<String>>, AppError> {
         let store = self.store.lock().await;

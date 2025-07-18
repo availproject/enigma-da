@@ -1,6 +1,7 @@
-use crate::db::types::DecryptRequestData;
 use crate::db::types::RegisterAppRequestData;
 use crate::db::types::RequestStatus;
+use crate::db::types::{DecryptRequestData, ReencryptRequestData};
+use crate::error::AppError;
 use crate::p2p::node::NodeCommand;
 use crate::traits::{DataStore as DataStoreTrait, NetworkManager as NetworkManagerTrait};
 use ecies::SecretKey;
@@ -27,6 +28,7 @@ const PEERS_FILE: &str = "peers.json";
 pub enum JobType {
     RegisterApp(u32, uuid::Uuid), // app_id, job_id
     DecryptJob(u32, uuid::Uuid, Vec<Vec<u8>>, Vec<Vec<u8>>), // app_id, job_id, encrypted_data, ephemeral_pub_key
+    ReencryptJob(u32, uuid::Uuid, Vec<u8>),                  // app_id, job_id, public_key
     CleanupShards,                                           // Cleanup job for old shards
 }
 
@@ -154,6 +156,26 @@ impl JobWorker {
                                 tracing::error!("Failed to handle decrypt job: {}", e);
                             }
                         }
+                        JobType::ReencryptJob(app_id, job_id, public_key) => {
+                            let result = self
+                                .handle_reencrypt_job(app_id, job_id, k, public_key)
+                                .await;
+                            if let Err(e) = result {
+                                self.data_store
+                                    .update_reencrypt_request(
+                                        job_id,
+                                        ReencryptRequestData {
+                                            app_id: app_id.to_string(),
+                                            job_id,
+                                            status: RequestStatus::Failed,
+                                            ephemeral_pub_key: None,
+                                            private_key_ciphertext: None,
+                                        },
+                                    )
+                                    .await?;
+                                tracing::error!("Failed to handle reencrypt job: {}", e);
+                            }
+                        }
                         JobType::CleanupShards => {
                             self.handle_cleanup_shards().await?;
                         }
@@ -171,6 +193,88 @@ impl JobWorker {
                 let _ = result?;
             }
         }
+
+        Ok(())
+    }
+
+    pub async fn handle_reencrypt_job(
+        &mut self,
+        app_id: u32,
+        job_id: uuid::Uuid,
+        k: u32,
+        public_key: Vec<u8>,
+    ) -> Result<(), anyhow::Error> {
+        tracing::info!(
+            "Handling reencrypt job for app_id: {}, job_id: {}",
+            app_id,
+            job_id
+        );
+        let app_peer_ids = self.data_store.get_app_peer_ids(app_id).await?;
+        if app_peer_ids.is_none() {
+            tracing::error!("No peer ids found for app_id: {}. Skipping job.", app_id);
+            return Ok(());
+        }
+        let peer_ids = app_peer_ids.unwrap();
+        // Sending request to the peers to get the shard
+        for peer_id in peer_ids {
+            self.network_manager
+                .send_command(NodeCommand::RequestShard {
+                    peer_id: peer_id.clone(),
+                    app_id: app_id.to_string(),
+                    job_id,
+                })
+                .await?;
+        }
+        // Wait for request to be completed
+        while let Some((pending, _)) = self.network_manager.get_request_status(job_id).await {
+            if pending == 0 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(SHARD_REQUEST_INTERVAL)).await;
+            self.retry_count += 1;
+            if self.retry_count > SHARD_REQUEST_RETRY_COUNT {
+                tracing::error!(
+                    "Failed to get shard for app_id: {}, job_id: {}",
+                    app_id,
+                    job_id
+                );
+                return Err(anyhow::anyhow!(
+                    "Failed to get shard for app_id: {}, job_id: {}",
+                    app_id,
+                    job_id
+                ));
+            }
+        }
+
+        let (response_sender, response_receiver) = tokio::sync::oneshot::channel();
+        self.network_manager
+            .send_command(NodeCommand::GetShard {
+                app_id: app_id.to_string(),
+                response_sender,
+            })
+            .await?;
+        let shards = response_receiver.await?;
+
+        let secret_key = convert_shards_to_key(
+            shards.values().map(|shard| shard.shard.clone()).collect(),
+            k,
+        )?;
+
+        let (ephemeral_pub_key, ciphertext) =
+            encrypt_private_key(&secret_key.serialize(), &public_key)?;
+
+        self.data_store
+            .update_reencrypt_request(
+                job_id,
+                ReencryptRequestData {
+                    app_id: app_id.to_string(),
+                    job_id,
+                    status: RequestStatus::Completed,
+                    ephemeral_pub_key: Some(ephemeral_pub_key),
+                    private_key_ciphertext: Some(ciphertext),
+                },
+            )
+            .await?;
 
         Ok(())
     }
@@ -462,4 +566,19 @@ fn delete_shards(app_id: u32) -> Result<(), anyhow::Error> {
         let _ = fs::remove_file(path);
     }
     Ok(())
+}
+
+pub fn encrypt_private_key(
+    private_key: &[u8],
+    public_key: &[u8],
+) -> Result<(Vec<u8>, Vec<u8>), AppError> {
+    let encrypted_private_key = ecies::encrypt(public_key, private_key).map_err(|e| {
+        tracing::error!(error = %e, "Failed to encrypt private key");
+        AppError::EncryptionError(e.to_string())
+    })?;
+
+    let key_size = ecies::config::get_ephemeral_key_size();
+    let (ephemeral_pub_key, ciphertext) = encrypted_private_key.split_at(key_size);
+
+    Ok((ephemeral_pub_key.to_vec(), ciphertext.to_vec()))
 }
