@@ -11,6 +11,17 @@ pub async fn encrypt(
     State(state): State<AppState>,
     Json(request): Json<EncryptRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    // Input validation
+    if request.plaintext.is_empty() {
+        tracing::warn!(app_id = request.app_id, "Empty plaintext provided");
+        return Err(AppError::InvalidInput("Plaintext cannot be empty".into()));
+    }
+
+    if request.app_id == 0 {
+        tracing::warn!("Invalid app_id: 0");
+        return Err(AppError::InvalidInput("app_id cannot be 0".into()));
+    }
+
     let request_span = tracing::info_span!(
         "encrypt_request",
         app_id = request.app_id,
@@ -26,14 +37,13 @@ pub async fn encrypt(
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to retrieve key");
-        })
-        .expect("Failed to retrieve key");
+            AppError::KeyGenerationError(format!("Failed to retrieve key: {}", e))
+        })?;
 
-    let account = to_account(&key)
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to convert key to account");
-        })
-        .expect("Failed to convert key to account");
+    let account = to_account(&key).map_err(|e| {
+        tracing::error!(error = %e, "Failed to convert key to account");
+        AppError::KeyGenerationError(format!("Failed to convert key to account: {}", e))
+    })?;
 
     tracing::debug!("Retrieving public key for encryption");
     let public_key = state
@@ -56,13 +66,10 @@ pub async fn encrypt(
 
     // activate below code when run within TEE
     let message_hash = keccak256(ciphertext);
-    let signature = account
-        .sign_hash(&message_hash)
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to sign message hash");
-        })
-        .expect("Failed to sign message hash");
+    let signature = account.sign_hash(&message_hash).await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to sign message hash");
+        AppError::EncryptionError(format!("Failed to sign message hash: {}", e))
+    })?;
 
     tracing::info!(
         app_id = request.app_id,

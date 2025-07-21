@@ -47,13 +47,19 @@ impl Default for ServiceConfig {
                 port: env::var("SERVER_PORT")
                     .unwrap_or_else(|_| "3000".to_string())
                     .parse()
-                    .unwrap_or(3000),
+                    .unwrap_or_else(|_| {
+                        tracing::warn!("Invalid SERVER_PORT, using default 3000");
+                        3000
+                    }),
             },
             p2p: P2PConfig {
                 port: env::var("P2P_PORT")
                     .unwrap_or_else(|_| "3001".to_string())
                     .parse()
-                    .unwrap_or(3001),
+                    .unwrap_or_else(|_| {
+                        tracing::warn!("Invalid P2P_PORT, using default 3001");
+                        3001
+                    }),
                 node_name: env::var("P2P_NODE_NAME")
                     .unwrap_or_else(|_| "encryption-service-node".to_string()),
                 protocol_name: env::var("P2P_PROTOCOL_NAME")
@@ -63,25 +69,40 @@ impl Default for ServiceConfig {
                 number_of_p2p_network_nodes: env::var("NUMBER_OF_P2P_NETWORK_NODES")
                     .unwrap_or_else(|_| "3".to_string())
                     .parse()
-                    .unwrap_or(3),
+                    .unwrap_or_else(|_| {
+                        tracing::warn!("Invalid NUMBER_OF_P2P_NETWORK_NODES, using default 3");
+                        3
+                    }),
             },
             worker: WorkerConfig {
                 shard_request_interval_secs: env::var("SHARD_REQUEST_INTERVAL_SECS")
                     .unwrap_or_else(|_| "5".to_string())
                     .parse()
-                    .unwrap_or(5),
+                    .unwrap_or_else(|_| {
+                        tracing::warn!("Invalid SHARD_REQUEST_INTERVAL_SECS, using default 5");
+                        5
+                    }),
                 shard_request_retry_count: env::var("SHARD_REQUEST_RETRY_COUNT")
                     .unwrap_or_else(|_| "5".to_string())
                     .parse()
-                    .unwrap_or(5),
+                    .unwrap_or_else(|_| {
+                        tracing::warn!("Invalid SHARD_REQUEST_RETRY_COUNT, using default 5");
+                        5
+                    }),
                 shard_cleanup_interval_hours: env::var("SHARD_CLEANUP_INTERVAL_HOURS")
                     .unwrap_or_else(|_| "6".to_string())
                     .parse()
-                    .unwrap_or(6),
+                    .unwrap_or_else(|_| {
+                        tracing::warn!("Invalid SHARD_CLEANUP_INTERVAL_HOURS, using default 6");
+                        6
+                    }),
                 job_queue_size: env::var("JOB_QUEUE_SIZE")
                     .unwrap_or_else(|_| "1000".to_string())
                     .parse()
-                    .unwrap_or(1000),
+                    .unwrap_or_else(|_| {
+                        tracing::warn!("Invalid JOB_QUEUE_SIZE, using default 1000");
+                        1000
+                    }),
             },
             database: DatabaseConfig {
                 path: env::var("DATABASE_PATH").unwrap_or_else(|_| "keystore_db".to_string()),

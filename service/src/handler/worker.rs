@@ -32,15 +32,15 @@ pub enum JobType {
     CleanupShards,                                           // Cleanup job for old shards
 }
 
-const SHARD_REQUEST_INTERVAL: u64 = 5;
-const SHARD_REQUEST_RETRY_COUNT: u32 = 5;
-const SHARD_CLEANUP_INTERVAL_HOURS: u64 = 6; // 6 hours
+// Constants are now defined in ServiceConfig and accessed via config parameter
 
 pub struct JobWorker {
     tx: mpsc::UnboundedSender<JobType>,
+    #[allow(dead_code)]
     rx: mpsc::UnboundedReceiver<JobType>,
     data_store: Arc<dyn DataStoreTrait + Send + Sync>,
     network_manager: Arc<dyn NetworkManagerTrait + Send + Sync>,
+    config: crate::config::ServiceConfig,
     retry_count: u32,
 }
 
@@ -48,6 +48,7 @@ impl JobWorker {
     pub fn new(
         data_store: Arc<dyn DataStoreTrait + Send + Sync>,
         network_manager: Arc<dyn NetworkManagerTrait + Send + Sync>,
+        config: crate::config::ServiceConfig,
     ) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
         Self {
@@ -55,6 +56,7 @@ impl JobWorker {
             rx,
             data_store,
             network_manager,
+            config,
             retry_count: 0,
         }
     }
@@ -63,7 +65,7 @@ impl JobWorker {
         mut rx: mpsc::Receiver<JobType>,
         data_store: Arc<dyn DataStoreTrait + Send + Sync>,
         network_manager: Arc<dyn NetworkManagerTrait + Send + Sync>,
-        _config: crate::config::ServiceConfig,
+        config: crate::config::ServiceConfig,
     ) -> Result<Self, anyhow::Error> {
         let (tx, unbounded_rx) = mpsc::unbounded_channel();
         let tx_clone = tx.clone();
@@ -82,6 +84,7 @@ impl JobWorker {
             rx: unbounded_rx,
             data_store,
             network_manager,
+            config,
             retry_count: 0,
         })
     }
@@ -90,7 +93,10 @@ impl JobWorker {
         self.tx.clone()
     }
 
-    pub async fn run_job_worker(mut self) -> Result<(), anyhow::Error> {
+    pub async fn run_job_worker_with_receiver(
+        mut self,
+        mut rx: mpsc::Receiver<JobType>,
+    ) -> Result<(), anyhow::Error> {
         // Clone the peers data to avoid holding mutex guard across async boundaries
         let peers = PEERS.lock().unwrap().clone();
         let n = *N;
@@ -108,7 +114,7 @@ impl JobWorker {
 
         let job_worker: tokio::task::JoinHandle<Result<(), anyhow::Error>> =
             tokio::spawn(async move {
-                while let Some(job) = self.rx.recv().await {
+                while let Some(job) = rx.recv().await {
                     match job {
                         JobType::RegisterApp(app_id, job_id) => {
                             let result = self
@@ -230,9 +236,12 @@ impl JobWorker {
             if pending == 0 {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_secs(SHARD_REQUEST_INTERVAL)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(
+                self.config.worker.shard_request_interval_secs,
+            ))
+            .await;
             self.retry_count += 1;
-            if self.retry_count > SHARD_REQUEST_RETRY_COUNT {
+            if self.retry_count > self.config.worker.shard_request_retry_count {
                 tracing::error!(
                     "Failed to get shard for app_id: {}, job_id: {}",
                     app_id,
@@ -313,9 +322,12 @@ impl JobWorker {
             if pending == 0 {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_secs(SHARD_REQUEST_INTERVAL)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(
+                self.config.worker.shard_request_interval_secs,
+            ))
+            .await;
             self.retry_count += 1;
-            if self.retry_count > SHARD_REQUEST_RETRY_COUNT {
+            if self.retry_count > self.config.worker.shard_request_retry_count {
                 tracing::error!(
                     "Failed to get shard for app_id: {}, job_id: {}",
                     app_id,
@@ -426,9 +438,12 @@ impl JobWorker {
             if pending == 0 {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_secs(SHARD_REQUEST_INTERVAL)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(
+                self.config.worker.shard_request_interval_secs,
+            ))
+            .await;
             self.retry_count += 1;
-            if self.retry_count > SHARD_REQUEST_RETRY_COUNT {
+            if self.retry_count > self.config.worker.shard_request_retry_count {
                 tracing::error!(
                     "Failed to send shard for app_id: {}, job_id: {}",
                     app_id,
@@ -470,7 +485,9 @@ impl JobWorker {
             .unwrap()
             .as_secs();
 
-        let cutoff_time = current_time - (SHARD_CLEANUP_INTERVAL_HOURS * 3600); // 6 hours ago
+        // Use a default cleanup interval since this is a static method
+        let cleanup_interval_hours = 6; // Default value
+        let cutoff_time = current_time - (cleanup_interval_hours * 3600); // 6 hours ago
 
         // Get all apps that have stored data
         let apps = data_store.list_apps().await?;

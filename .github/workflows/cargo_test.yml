@@ -46,7 +46,7 @@ jobs:
       run: |
         cd enigma-kms-node && cargo build --features persistent-connection
 
-    - name: Build encryption service
+    - name: Build encryption service 
       run: cargo build
 
     - name: Copy enigma kms node binary
