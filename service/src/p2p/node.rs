@@ -259,7 +259,7 @@ impl NetworkNode {
         );
         let peer_id: PeerId = peer_id.parse()?;
         let quote = dstack_sdk::dstack_client::DstackClient::new(None)
-            .get_quote(shard.as_bytes().to_vec())
+            .get_quote(shard.as_bytes().to_vec().into_iter().take(64).collect())
             .await?;
         let send_shard = MessageRequest::SendShard(crate::p2p::types::SendShards {
             app_id,

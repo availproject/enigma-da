@@ -44,7 +44,7 @@ jobs:
 
     - name: Build enigma kms node
       run: |
-        cd enigma-kms-node && cargo build --features persistent-connection
+        cd enigma-kms-node && cargo build --features "persistent-connection local-quote-verification"
 
     - name: Build encryption service 
       run: cargo build
