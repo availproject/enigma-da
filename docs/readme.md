@@ -7,7 +7,7 @@ Enigma's DA service is a service that takes requests from turbo DA for encryptio
 ## Components Index
 
 - [Encryption Service](./encryption-service.md)
-- [KMS Nodes](./kms-nodes.md)
+- [KMS Nodes](https://github.com/RizeLabs/enigma-kms-node/blob/main/Readme.md)
 
 ## High Level Architecture
 
