@@ -13,6 +13,12 @@ pub async fn register(
     State(state): State<AppState>,
     Json(request): Json<RegisterAppRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    // Input validation
+    if request.app_id == 0 {
+        tracing::warn!("Invalid app_id: 0");
+        return Err(AppError::InvalidInput("app_id cannot be 0".into()));
+    }
+
     let request_span = tracing::info_span!("register_request", app_id = request.app_id);
     let _guard = request_span.enter();
 

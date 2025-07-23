@@ -92,7 +92,27 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(&addr).await?;
 
     tracing::info!(address = %addr, "Encryption server listening");
-    axum::serve(listener, app).await?;
 
+    // Set up graceful shutdown
+    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
+
+    // Handle shutdown signals
+    tokio::spawn(async move {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to listen for ctrl+c");
+        tracing::info!("Received shutdown signal");
+        let _ = shutdown_tx.send(());
+    });
+
+    // Start the server with graceful shutdown
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async {
+            shutdown_rx.await.ok();
+            tracing::info!("Shutting down server...");
+        })
+        .await?;
+
+    tracing::info!("Server shutdown complete");
     Ok(())
 }

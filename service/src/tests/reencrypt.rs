@@ -15,7 +15,15 @@ use http_body_util::BodyExt;
 use rstest::rstest;
 use std::sync::Arc;
 
-const TEST_KEYSTORE_DB_REENCRYPT_REQUEST: &str = "test_keystore_reencrypt_request_db";
+// Use a unique database path for this test to avoid conflicts
+fn get_test_db_path() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    format!("test_keystore_reencrypt_request_db_{}", timestamp)
+}
 
 #[rstest]
 fn test_encrypt_private_key() {
@@ -48,8 +56,9 @@ async fn test_reencrypt_request_endpoint() {
     let config = ServiceConfig::default();
 
     // Initialize async components with trait objects
+    let test_db_path = get_test_db_path();
     let data_store: Arc<dyn DataStore + Send + Sync> = Arc::new(
-        AsyncDataStore::from_path(TEST_KEYSTORE_DB_REENCRYPT_REQUEST, config.clone())
+        AsyncDataStore::from_path(&test_db_path, config.clone())
             .expect("Failed to create async data store"),
     );
     let mut network_manager: Arc<dyn NetworkManager + Send + Sync> = Arc::new(
