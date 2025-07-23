@@ -18,6 +18,7 @@ pub struct SendShards {
     pub shard: String,
     pub shard_index: u32,
     pub job_id: uuid::Uuid,
+    pub quote: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
