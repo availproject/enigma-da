@@ -6,8 +6,8 @@ use std::sync::Arc;
 use tower_http::trace::TraceLayer;
 
 use crate::api::{
-    decrypt, encrypt, get_decrypt_request_status, get_register_app_request_status, quote,
-    reencrypt, register,
+    decrypt, encrypt, get_decrypt_request_status, get_reencrypt_request_status,
+    get_register_app_request_status, quote, reencrypt, register,
 };
 use crate::config::ServiceConfig;
 use crate::db::async_store::AsyncDataStore;
@@ -84,6 +84,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/private-key", post(reencrypt))
         .route("/v1/decrypt-status", get(get_decrypt_request_status))
         .route("/v1/register-status", get(get_register_app_request_status))
+        .route("/v1/private-key-status", get(get_reencrypt_request_status))
         .layer(TraceLayer::new_for_http())
         .with_state(app_state);
 
@@ -91,7 +92,27 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(&addr).await?;
 
     tracing::info!(address = %addr, "Encryption server listening");
-    axum::serve(listener, app).await?;
 
+    // Set up graceful shutdown
+    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
+
+    // Handle shutdown signals
+    tokio::spawn(async move {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to listen for ctrl+c");
+        tracing::info!("Received shutdown signal");
+        let _ = shutdown_tx.send(());
+    });
+
+    // Start the server with graceful shutdown
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async {
+            shutdown_rx.await.ok();
+            tracing::info!("Shutting down server...");
+        })
+        .await?;
+
+    tracing::info!("Server shutdown complete");
     Ok(())
 }

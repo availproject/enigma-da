@@ -1,7 +1,8 @@
 use crate::config::ServiceConfig;
 use crate::db::types::{
     DECRYPT_REQUEST_PREFIX, DecryptRequestData, PEER_ID_PREFIX, PUBLIC_KEY_PREFIX, PeerIdData,
-    REGISTER_APP_REQUEST_PREFIX, RegisterAppRequestData, SHARD_PREFIX, ShardData,
+    REENCRYPT_REQUEST_PREFIX, REGISTER_APP_REQUEST_PREFIX, ReencryptRequestData,
+    RegisterAppRequestData, SHARD_PREFIX, ShardData,
 };
 use anyhow::Result;
 use sled::Db;
@@ -10,12 +11,38 @@ use std::collections::HashMap;
 pub struct DataStore {
     db: Db,
     config: ServiceConfig,
+    db_path: String,
+    write_count: std::sync::atomic::AtomicU64,
 }
 
 impl DataStore {
     pub fn new(db_path: &str, config: ServiceConfig) -> Result<Self> {
         let db = sled::open(db_path)?;
-        Ok(Self { db, config })
+        Ok(Self {
+            db,
+            config,
+            db_path: db_path.to_string(),
+            write_count: std::sync::atomic::AtomicU64::new(0),
+        })
+    }
+
+    pub fn get_db_path(&self) -> &str {
+        &self.db_path
+    }
+
+    pub fn get_config(&self) -> &ServiceConfig {
+        &self.config
+    }
+
+    fn maybe_flush(&self) -> Result<()> {
+        let write_count = self
+            .write_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        // Flush every 100 writes to reduce I/O overhead
+        if write_count % 100 == 0 {
+            self.db.flush()?;
+        }
+        Ok(())
     }
 
     pub fn store_public_key(&self, app_id: u32, public_key: &[u8]) -> Result<()> {
@@ -28,6 +55,9 @@ impl DataStore {
         self.db
             .insert(pub_key_key.as_bytes(), public_key)
             .map_err(|e| anyhow::anyhow!("Failed to store public key: {}", e))?;
+
+        // Only flush periodically, not on every write
+        self.maybe_flush()?;
 
         Ok(())
     }
@@ -105,7 +135,7 @@ impl DataStore {
         };
         let value = bincode::serialize(&shard_data)?;
         self.db.insert(key.as_bytes(), value)?;
-        self.db.flush()?;
+        self.maybe_flush()?;
         Ok(())
     }
 
@@ -118,7 +148,7 @@ impl DataStore {
         };
         let value = bincode::serialize(&peer_data)?;
         self.db.insert(key.as_bytes(), value)?;
-        self.db.flush()?;
+        self.maybe_flush()?;
         Ok(())
     }
 
@@ -126,7 +156,7 @@ impl DataStore {
     pub fn remove_app_peer_ids(&self, app_id: u32) -> Result<()> {
         let key = format!("{}:{}", PEER_ID_PREFIX, app_id);
         self.db.remove(key.as_bytes())?;
-        self.db.flush()?;
+        self.maybe_flush()?;
         Ok(())
     }
 
@@ -134,7 +164,7 @@ impl DataStore {
     pub fn remove_shard(&self, app_id: u32, shard_index: u32) -> Result<()> {
         let key = format!("{}:{}:{}", SHARD_PREFIX, app_id, shard_index);
         self.db.remove(key.as_bytes())?;
-        self.db.flush()?;
+        self.maybe_flush()?;
         Ok(())
     }
 
@@ -151,7 +181,7 @@ impl DataStore {
         let peer_key = format!("{}:{}", PEER_ID_PREFIX, app_id);
         self.db.remove(peer_key.as_bytes())?;
 
-        self.db.flush()?;
+        self.maybe_flush()?;
         Ok(())
     }
 
@@ -159,7 +189,7 @@ impl DataStore {
         let key = format!("{}:{}", DECRYPT_REQUEST_PREFIX, request.job_id);
         let value = bincode::serialize(&request)?;
         self.db.insert(key.as_bytes(), value)?;
-        self.db.flush()?;
+        self.maybe_flush()?;
         Ok(())
     }
 
@@ -171,7 +201,7 @@ impl DataStore {
         let key = format!("{}:{}", DECRYPT_REQUEST_PREFIX, job_id);
         let value = bincode::serialize(&request)?;
         self.db.insert(key.as_bytes(), value)?;
-        self.db.flush()?;
+        self.maybe_flush()?;
         Ok(())
     }
 
@@ -187,7 +217,7 @@ impl DataStore {
         let key = format!("{}:{}", REGISTER_APP_REQUEST_PREFIX, request.job_id);
         let value = bincode::serialize(&request)?;
         self.db.insert(key.as_bytes(), value)?;
-        self.db.flush()?;
+        self.maybe_flush()?;
         Ok(())
     }
 
@@ -199,7 +229,7 @@ impl DataStore {
         let key = format!("{}:{}", REGISTER_APP_REQUEST_PREFIX, job_id);
         let value = bincode::serialize(&request)?;
         self.db.insert(key.as_bytes(), value)?;
-        self.db.flush()?;
+        self.maybe_flush()?;
         Ok(())
     }
 
@@ -208,6 +238,37 @@ impl DataStore {
         job_id: uuid::Uuid,
     ) -> Result<Option<RegisterAppRequestData>> {
         let key = format!("{}:{}", REGISTER_APP_REQUEST_PREFIX, job_id);
+        match self.db.get(key.as_bytes())? {
+            Some(value) => Ok(Some(bincode::deserialize(&value)?)),
+            None => Ok(None),
+        }
+    }
+
+    pub fn store_reencrypt_request(&self, request: ReencryptRequestData) -> Result<()> {
+        let key = format!("{}:{}", REENCRYPT_REQUEST_PREFIX, request.job_id);
+        let value = bincode::serialize(&request)?;
+        self.db.insert(key.as_bytes(), value)?;
+        self.maybe_flush()?;
+        Ok(())
+    }
+
+    pub fn update_reencrypt_request(
+        &self,
+        job_id: uuid::Uuid,
+        request: ReencryptRequestData,
+    ) -> Result<()> {
+        let key = format!("{}:{}", REENCRYPT_REQUEST_PREFIX, job_id);
+        let value = bincode::serialize(&request)?;
+        self.db.insert(key.as_bytes(), value)?;
+        self.maybe_flush()?;
+        Ok(())
+    }
+
+    pub fn get_reencrypt_request(
+        &self,
+        job_id: uuid::Uuid,
+    ) -> Result<Option<ReencryptRequestData>> {
+        let key = format!("{}:{}", REENCRYPT_REQUEST_PREFIX, job_id);
         match self.db.get(key.as_bytes())? {
             Some(value) => Ok(Some(bincode::deserialize(&value)?)),
             None => Ok(None),

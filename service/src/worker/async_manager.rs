@@ -22,15 +22,10 @@ impl AsyncWorkerManager {
 
         let config_clone = config.clone();
         let worker_handle = tokio::spawn(async move {
-            // Create and run the worker
-            let worker = crate::handler::worker::JobWorker::new_with_receiver(
-                rx,
-                data_store,
-                network_manager,
-                config_clone,
-            )
-            .await?;
-            worker.run_job_worker().await
+            // Create and run the worker directly
+            let worker =
+                crate::handler::worker::JobWorker::new(data_store, network_manager, config_clone);
+            worker.run_job_worker_with_receiver(rx).await
         });
 
         Ok(Self {

@@ -14,6 +14,7 @@ fn main() {
         .arg("build")
         .arg("--features")
         .arg("persistent-connection")
+        .arg("local-quote-verification")
         .output()
         .expect("Failed to build submodule");
     println!("✅ Build Submodule Completed!");

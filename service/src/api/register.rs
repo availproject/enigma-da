@@ -13,6 +13,12 @@ pub async fn register(
     State(state): State<AppState>,
     Json(request): Json<RegisterAppRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    // Input validation
+    if request.app_id == 0 {
+        tracing::warn!("Invalid app_id: 0");
+        return Err(AppError::InvalidInput("app_id cannot be 0".into()));
+    }
+
     let request_span = tracing::info_span!("register_request", app_id = request.app_id);
     let _guard = request_span.enter();
 
@@ -97,7 +103,7 @@ pub async fn get_register_app_request_status(
             job_id = request.job_id.to_string(),
             "Register app request not found"
         );
-        return Err(AppError::RegisterAppRequestNotFound(format!(
+        return Err(AppError::RequestNotFound(format!(
             "Register app request not found for job id: {}",
             request.job_id
         )));

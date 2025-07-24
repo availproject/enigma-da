@@ -258,11 +258,16 @@ impl NetworkNode {
             self.node_name, peer_id, app_id, shard_index
         );
         let peer_id: PeerId = peer_id.parse()?;
+        let quote = dstack_sdk::dstack_client::DstackClient::new(None)
+            .get_quote(shard.as_bytes().to_vec().into_iter().take(64).collect())
+            .await?;
         let send_shard = MessageRequest::SendShard(crate::p2p::types::SendShards {
             app_id,
             shard_index,
             shard,
             job_id,
+            quote: bincode::serialize(&quote)
+                .map_err(|e| anyhow::anyhow!("Failed to serialize quote: {}", e))?,
         });
 
         let request_id = self
