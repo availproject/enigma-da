@@ -358,6 +358,23 @@ impl NetworkNode {
 
         let mut ctrl_c = Box::pin(tokio::signal::ctrl_c());
 
+        // Dial and connect to peers
+        info!("[{}] 🔧 Connecting to peers", self.node_name);
+        let peers = {
+            let guard = crate::handler::worker::PEERS
+                .lock()
+                .map_err(|e| anyhow::anyhow!("Failed to lock PEERS: {}", e))?;
+            guard.clone()
+        };
+        for peer in peers.iter() {
+            self.swarm
+                .behaviour_mut()
+                .gossipsub
+                .add_explicit_peer(&peer.peer_id.parse()?);
+            self.connect_to_peer(&peer.multiaddress).await?;
+            info!("[{}] ✅ Connected to peer {}", self.node_name, peer.peer_id);
+        }
+
         loop {
             tokio::select! {
                 event = self.swarm.select_next_some() => {

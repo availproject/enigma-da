@@ -25,3 +25,7 @@ keystore_db
 
 peer_id_*.txt
 service/conf/
+data/
+
+# Environment variables
+.env

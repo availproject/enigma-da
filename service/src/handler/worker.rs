@@ -11,15 +11,22 @@ use keys::keys::PrivateKeyShare;
 use keys::keys::Verifier;
 use keys::keystore::KeyStore;
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Peer {
+    pub peer_id: String,
+    pub multiaddress: String,
+}
+
 lazy_static! {
-    static ref PEERS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(load_json_array());
-    static ref N: u32 = PEERS.lock().unwrap().len() as u32;
-    static ref K: u32 = *N / 2 + 1;
+    pub static ref PEERS: std::sync::Mutex<Vec<Peer>> = std::sync::Mutex::new(load_json_array());
+    pub static ref N: u32 = PEERS.lock().unwrap().len() as u32;
+    pub static ref K: u32 = *N / 2 + 1;
 }
 
 const PEERS_FILE: &str = "peers.json";
@@ -395,7 +402,7 @@ impl JobWorker {
         &mut self,
         app_id: u32,
         job_id: uuid::Uuid,
-        peers: &Vec<String>,
+        peers: &Vec<Peer>,
         n: u32,
         k: u32,
     ) -> Result<(), anyhow::Error> {
@@ -416,7 +423,7 @@ impl JobWorker {
             .store_public_key(app_id, &public_key)
             .await?;
         self.data_store
-            .add_app_peer_ids(app_id, peers.clone())
+            .add_app_peer_ids(app_id, peers.iter().map(|p| p.peer_id.clone()).collect())
             .await?;
 
         // read the shards
@@ -424,7 +431,7 @@ impl JobWorker {
         for (i, peer_id) in peers.iter().enumerate() {
             self.network_manager
                 .send_command(NodeCommand::SendShard {
-                    peer_id: peer_id.clone(),
+                    peer_id: peer_id.peer_id.clone(),
                     app_id: app_id.to_string(),
                     shard_index: i as u32,
                     shard: shards[i].clone(),
@@ -536,7 +543,7 @@ impl JobWorker {
     }
 }
 
-fn load_json_array() -> Vec<String> {
+fn load_json_array() -> Vec<Peer> {
     let data = fs::read_to_string(PEERS_FILE).expect("Failed to read peers.json file");
 
     serde_json::from_str(&data).expect("Failed to parse peers.json as JSON array")
