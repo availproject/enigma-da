@@ -43,7 +43,7 @@ mod tests;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     init_tracer(TracingConfig::default());
-    tracing::info!("Starting encryption server...");
+    tracing::info!("Starting encryption server and services...");
 
     // Load configuration
     let config = ServiceConfig::from_env();
@@ -53,6 +53,7 @@ async fn main() -> anyhow::Result<()> {
         AsyncDataStore::from_path(&config.database.path, config.clone())
             .expect("Failed to create async data store"),
     );
+    tracing::info!("Data store initialized");
     let network_manager: Arc<dyn NetworkManager + Send + Sync> = Arc::new(
         AsyncNetworkManager::from_config(
             config.p2p.port,
@@ -62,10 +63,12 @@ async fn main() -> anyhow::Result<()> {
         .await
         .expect("Failed to create async network manager"),
     );
+    tracing::info!("Network manager initialized");
     let worker_manager: Arc<dyn WorkerManager + Send + Sync> = Arc::new(
         AsyncWorkerManager::new(data_store.clone(), network_manager.clone(), &config.clone())
             .expect("Failed to create async worker manager"),
     );
+    tracing::info!("Worker manager initialized");
 
     // Create application state with async trait objects
     let app_state = AppState {
