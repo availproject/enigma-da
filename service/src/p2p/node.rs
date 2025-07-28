@@ -2,6 +2,7 @@ use crate::config::ServiceConfig;
 use crate::db::store::DataStore;
 use crate::db::types::ShardData;
 use crate::p2p::types::{MessageProtocol, MessageRequest, MessageResponse, get_p2p_identifier};
+use dstack_sdk::dstack_client::GetQuoteResponse;
 use keys::keys::{PrivateKeyShare, Verifier};
 use libp2p::futures::StreamExt;
 use libp2p::swarm::Config;
@@ -141,7 +142,7 @@ impl NetworkNode {
         ));
 
         // This is only for testing purposes. To keep the connection alive.
-        #[cfg(test)]
+        #[cfg(any(test, feature = "persistent-connection"))]
         {
             let topic = gossipsub::IdentTopic::new("test-keep-alive");
             gossipsub.subscribe(&topic)?;
@@ -258,9 +259,22 @@ impl NetworkNode {
             self.node_name, peer_id, app_id, shard_index
         );
         let peer_id: PeerId = peer_id.parse()?;
-        let quote = dstack_sdk::dstack_client::DstackClient::new(None)
+        let quote = match dstack_sdk::dstack_client::DstackClient::new(None)
             .get_quote(shard.as_bytes().to_vec().into_iter().take(64).collect())
-            .await?;
+            .await
+        {
+            Ok(quote) => quote,
+            Err(e) => {
+                warn!(
+                    "[{}] ❌ Failed to get quote: {}. Shard will be sent without quote",
+                    self.node_name, e
+                );
+                GetQuoteResponse {
+                    quote: "".to_string(),
+                    event_log: "".to_string(),
+                }
+            }
+        };
         let send_shard = MessageRequest::SendShard(crate::p2p::types::SendShards {
             app_id,
             shard_index,

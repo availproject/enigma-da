@@ -335,16 +335,18 @@ impl JobWorker {
             .await;
             self.retry_count += 1;
             if self.retry_count > self.config.worker.shard_request_retry_count {
-                tracing::error!(
-                    "Failed to get shard for app_id: {}, job_id: {}",
+                tracing::warn!(
+                    "All shards are not received for app_id: {}, job_id: {}.[IMPORTANT] This can be a false alarm",
                     app_id,
                     job_id
                 );
-                return Err(anyhow::anyhow!(
-                    "Failed to get shard for app_id: {}, job_id: {}",
-                    app_id,
-                    job_id
-                ));
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                break;
+                // return Err(anyhow::anyhow!(
+                //     "Failed to get shard for app_id: {}, job_id: {}",
+                //     app_id,
+                //     job_id
+                // ));
             }
         }
 
@@ -451,16 +453,18 @@ impl JobWorker {
             .await;
             self.retry_count += 1;
             if self.retry_count > self.config.worker.shard_request_retry_count {
-                tracing::error!(
-                    "Failed to send shard for app_id: {}, job_id: {}",
+                tracing::warn!(
+                    "All shards are not sent for app_id: {}, job_id: {}.[IMPORTANT] This can be a false alarm",
                     app_id,
                     job_id
                 );
-                return Err(anyhow::anyhow!(
-                    "Failed to send shard for app_id: {}, job_id: {}",
-                    app_id,
-                    job_id
-                ));
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                break;
+                // return Err(anyhow::anyhow!(
+                //     "Failed to send shard for app_id: {}, job_id: {}",
+                //     app_id,
+                //     job_id
+                // ));
             }
         }
 

@@ -1,10 +1,14 @@
 services:
   encifher-service:
-    image: encifher-encryption-service:latest
+    # image: encifher-encryption-service:latest
+    image: ocdbytes/encifher-encryption-service-amd:latest
     container_name: encifher-encryption-service
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    #   platforms:
+    #     - linux/amd64
+    #     - linux/arm64
     ports:
       - "${SERVER_PORT}:${SERVER_PORT}"
     environment:

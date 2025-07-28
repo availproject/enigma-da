@@ -14,7 +14,7 @@ the `.env` file.
 4. Build the node using docker :
 
     ```bash
-        docker-compose --env-file .env up --build
+        docker-compose --env-file .env build
     ```
 
 5. Run the node using docker :

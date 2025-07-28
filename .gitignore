@@ -24,8 +24,9 @@ keystore_db
 **/*_db_*
 
 peer_id_*.txt
-service/conf/
+**/conf/
 data/
 
 # Environment variables
 .env
+*.bin

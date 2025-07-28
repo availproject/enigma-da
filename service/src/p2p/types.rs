@@ -8,7 +8,7 @@ lazy_static! {
     };
     static ref P2P_IDENTIFY_PROTOCOL_VERSION: String = {
         std::env::var("P2P_IDENTIFY_PROTOCOL_VERSION")
-            .unwrap_or_else(|_| "/enigma-encrypted-network/1.0.0".to_string())
+            .unwrap_or_else(|_| "/encrypted-network/1.0.0".to_string())
     };
 }
 
