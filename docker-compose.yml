@@ -1,12 +1,17 @@
 services:
   encifher-service:
-    image: encifher-encryption-service:latest
+    # image: encifher-encryption-service:latest
+    image: encifher-encryption-service-amd:latest
     container_name: encifher-encryption-service
     build:
       context: .
       dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+        # - linux/arm64
     ports:
-      - "${SERVER_PORT}:${SERVER_PORT}"
+      - "3000:3000"
+      # - "${SERVER_PORT}:${SERVER_PORT}"
     environment:
       RUST_LOG: info
       RUST_BACKTRACE: 1
@@ -26,5 +31,5 @@ services:
       # Database Config
       DATABASE_PATH: ${DATABASE_PATH}
     volumes:
-      - /var/run/dstack.sock:/var/run/dstack.sock
+      - /var/run/tappd.sock:/var/run/tappd.sock
     command: ["/app/start.sh"]

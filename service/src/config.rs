@@ -65,29 +65,29 @@ impl Default for ServiceConfig {
                 protocol_name: env::var("P2P_PROTOCOL_NAME")
                     .unwrap_or_else(|_| "/enigma-kms-p2p/message/1.0.0".to_string()),
                 identify_protocol_version: env::var("P2P_IDENTIFY_PROTOCOL_VERSION")
-                    .unwrap_or_else(|_| "/enigma-encrypted-network/1.0.0".to_string()),
+                    .unwrap_or_else(|_| "/encrypted-network/1.0.0".to_string()),
                 number_of_p2p_network_nodes: env::var("NUMBER_OF_P2P_NETWORK_NODES")
-                    .unwrap_or_else(|_| "3".to_string())
+                    .unwrap_or_else(|_| "4".to_string())
                     .parse()
                     .unwrap_or_else(|_| {
-                        tracing::warn!("Invalid NUMBER_OF_P2P_NETWORK_NODES, using default 3");
-                        3
+                        tracing::warn!("Invalid NUMBER_OF_P2P_NETWORK_NODES, using default 4");
+                        4
                     }),
             },
             worker: WorkerConfig {
                 shard_request_interval_secs: env::var("SHARD_REQUEST_INTERVAL_SECS")
-                    .unwrap_or_else(|_| "5".to_string())
+                    .unwrap_or_else(|_| "10".to_string())
                     .parse()
                     .unwrap_or_else(|_| {
-                        tracing::warn!("Invalid SHARD_REQUEST_INTERVAL_SECS, using default 5");
-                        5
+                        tracing::warn!("Invalid SHARD_REQUEST_INTERVAL_SECS, using default 10");
+                        10
                     }),
                 shard_request_retry_count: env::var("SHARD_REQUEST_RETRY_COUNT")
-                    .unwrap_or_else(|_| "5".to_string())
+                    .unwrap_or_else(|_| "10".to_string())
                     .parse()
                     .unwrap_or_else(|_| {
-                        tracing::warn!("Invalid SHARD_REQUEST_RETRY_COUNT, using default 5");
-                        5
+                        tracing::warn!("Invalid SHARD_REQUEST_RETRY_COUNT, using default 10");
+                        10
                     }),
                 shard_cleanup_interval_hours: env::var("SHARD_CLEANUP_INTERVAL_HOURS")
                     .unwrap_or_else(|_| "6".to_string())

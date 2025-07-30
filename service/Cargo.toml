@@ -40,3 +40,6 @@ k256 = { workspace = true }
 rstest = "0.20.0"
 http-body-util = "0.1.0"
 tempfile = {workspace = true}
+
+[features]
+persistent-connection = []

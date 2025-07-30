@@ -2,10 +2,10 @@ use crate::error::AppError;
 
 use crate::types::QuoteResponse;
 use axum::{Json, response::IntoResponse};
-use dstack_sdk::dstack_client::DstackClient;
+use dstack_sdk::tappd_client::TappdClient;
 
 pub async fn quote() -> Result<impl IntoResponse, AppError> {
-    let client = DstackClient::new(None);
+    let client = TappdClient::new(None);
 
     let quote_resp = client.get_quote(b"test-data".to_vec()).await.map_err(|e| {
         tracing::error!(error = ?e, "Failed to generate quote");

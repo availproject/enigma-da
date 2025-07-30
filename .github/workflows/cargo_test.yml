@@ -39,12 +39,12 @@ jobs:
     - name: Build and Setup dstack
       run: |
        cd dstack/sdk/simulator && ./build.sh
-       echo "DSTACK_SIMULATOR_ENDPOINT=$(pwd)/dstack.sock" >> $GITHUB_ENV
+       echo "TAPPD_SIMULATOR_ENDPOINT=$(pwd)/tappd.sock" >> $GITHUB_ENV
        ./dstack-simulator &
 
     - name: Build enigma kms node
       run: |
-        cd enigma-kms-node && cargo build --features "persistent-connection local-quote-verification"
+        cd enigma-kms-node && cargo build --features local-quote-verification
 
     - name: Build encryption service 
       run: cargo build
