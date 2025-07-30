@@ -1,14 +1,14 @@
 use crate::config::ServiceConfig;
 use crate::db::store::DataStore;
 use crate::db::types::ShardData;
-use crate::p2p::types::{MessageProtocol, MessageRequest, MessageResponse, get_p2p_identifier};
-use dstack_sdk::dstack_client::GetQuoteResponse;
+use crate::p2p::types::{MessageProtocol, MessageRequest, MessageResponse};
+use dstack_sdk::tappd_client::TdxQuoteResponse;
 use keys::keys::{PrivateKeyShare, Verifier};
 use libp2p::futures::StreamExt;
 use libp2p::swarm::Config;
-use libp2p::{Multiaddr, Transport, ping};
+use libp2p::{Multiaddr, Transport};
 use libp2p::{
-    PeerId, Swarm, gossipsub, identify, kad, mdns, noise,
+    PeerId, Swarm, mdns, noise,
     request_response::{self, OutboundRequestId, ProtocolSupport},
     swarm::NetworkBehaviour,
     swarm::SwarmEvent,
@@ -45,12 +45,8 @@ fn load_or_generate_keypair(node_name: &str) -> anyhow::Result<libp2p::identity:
 
 #[derive(NetworkBehaviour)]
 pub struct P2PBehaviour {
-    pub gossipsub: gossipsub::Behaviour,
     pub mdns: mdns::tokio::Behaviour,
     pub request_response: request_response::Behaviour<MessageProtocol>,
-    pub identify: identify::Behaviour,
-    pub kademlia: kad::Behaviour<kad::store::MemoryStore>,
-    pub ping: ping::Behaviour,
 }
 
 pub struct NetworkNode {
@@ -108,58 +104,21 @@ impl NetworkNode {
             .multiplex(yamux::Config::default())
             .boxed();
 
-        // Create Kademlia behaviour
-        let store = kad::store::MemoryStore::new(local_peer_id);
-        let kademlia = kad::Behaviour::new(local_peer_id, store);
-
         // Create request-response behaviour
         let request_response = request_response::Behaviour::new(
             std::iter::once((MessageProtocol, ProtocolSupport::Full)),
             request_response::Config::default().with_request_timeout(Duration::from_secs(60)),
         );
 
-        // Create Gossipsub behaviour
-        let gossipsub_config = gossipsub::ConfigBuilder::default()
-            .heartbeat_interval(Duration::from_secs(10))
-            .validation_mode(gossipsub::ValidationMode::Strict)
-            .build()
-            .map_err(|msg| anyhow::anyhow!("Gossipsub config error: {}", msg))?;
-
-        #[allow(unused_mut)]
-        let mut gossipsub = gossipsub::Behaviour::new(
-            gossipsub::MessageAuthenticity::Signed(local_key.clone()),
-            gossipsub_config,
-        )
-        .map_err(|msg| anyhow::anyhow!("Gossipsub error: {}", msg))?;
-
         // Create mDNS behaviour
         let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), local_peer_id)?;
-
-        // Create identify behaviour
-        let identify = identify::Behaviour::new(identify::Config::new(
-            get_p2p_identifier().to_string(),
-            local_key.public(),
-        ));
-
-        // This is only for testing purposes. To keep the connection alive.
-        #[cfg(any(test, feature = "persistent-connection"))]
-        {
-            let topic = gossipsub::IdentTopic::new("test-keep-alive");
-            gossipsub.subscribe(&topic)?;
-        }
 
         let (command_sender, command_receiver) = mpsc::unbounded_channel();
 
         // Create network behaviour
         let behaviour = P2PBehaviour {
-            gossipsub,
             mdns,
             request_response,
-            identify,
-            kademlia,
-            ping: ping::Behaviour::new(
-                ping::Config::default().with_timeout(Duration::from_secs(60)),
-            ),
         };
 
         // Create swarm
@@ -167,7 +126,8 @@ impl NetworkNode {
             transport,
             behaviour,
             local_peer_id,
-            Config::with_tokio_executor(),
+            Config::with_tokio_executor()
+                .with_idle_connection_timeout(Duration::from_secs(60 * 60 * 24 * 120)), // 120 days
         );
 
         // Listen on all interfaces
@@ -259,7 +219,7 @@ impl NetworkNode {
             self.node_name, peer_id, app_id, shard_index
         );
         let peer_id: PeerId = peer_id.parse()?;
-        let quote = match dstack_sdk::dstack_client::DstackClient::new(None)
+        let quote = match dstack_sdk::tappd_client::TappdClient::new(None)
             .get_quote(shard.as_bytes().to_vec().into_iter().take(64).collect())
             .await
         {
@@ -269,9 +229,11 @@ impl NetworkNode {
                     "[{}] ❌ Failed to get quote: {}. Shard will be sent without quote",
                     self.node_name, e
                 );
-                GetQuoteResponse {
+                TdxQuoteResponse {
                     quote: "".to_string(),
                     event_log: "".to_string(),
+                    hash_algorithm: None,
+                    prefix: None,
                 }
             }
         };
@@ -381,10 +343,6 @@ impl NetworkNode {
             guard.clone()
         };
         for peer in peers.iter() {
-            self.swarm
-                .behaviour_mut()
-                .gossipsub
-                .add_explicit_peer(&peer.peer_id.parse()?);
             self.connect_to_peer(&peer.multiaddress).await?;
             info!("[{}] ✅ Connected to peer {}", self.node_name, peer.peer_id);
         }
@@ -467,19 +425,6 @@ impl NetworkNode {
 
     async fn handle_behaviour_event(&mut self, event: P2PBehaviourEvent) -> anyhow::Result<()> {
         match event {
-            P2PBehaviourEvent::Gossipsub(gossipsub::Event::Message {
-                propagation_source: _,
-                message_id: _,
-                message,
-            }) => {
-                // Handle gossipsub messages if needed
-                info!(
-                    "[{}] 📢 Broadcast message received: {:?}",
-                    self.node_name,
-                    String::from_utf8_lossy(&message.data)
-                );
-            }
-
             P2PBehaviourEvent::RequestResponse(request_response::Event::OutboundFailure {
                 peer,
                 request_id,
@@ -658,31 +603,12 @@ impl NetworkNode {
                     }
                 }
             }
-
-            P2PBehaviourEvent::Mdns(mdns::Event::Discovered(list)) => {
-                for (peer_id, multiaddr) in list {
-                    info!("Discovered peer {} at {}", peer_id, multiaddr);
-                    self.swarm
-                        .behaviour_mut()
-                        .gossipsub
-                        .add_explicit_peer(&peer_id);
-                }
+            _ => {
+                info!(
+                    "[{}] 🔍 Received unknown event: {:?}",
+                    self.node_name, event
+                );
             }
-
-            P2PBehaviourEvent::Mdns(mdns::Event::Expired(list)) => {
-                for (peer_id, _) in list {
-                    self.swarm
-                        .behaviour_mut()
-                        .gossipsub
-                        .remove_explicit_peer(&peer_id);
-                }
-            }
-
-            P2PBehaviourEvent::Identify(identify::Event::Received { peer_id, info }) => {
-                info!("Identified peer {}: {}", peer_id, info.protocol_version);
-            }
-
-            _ => {}
         }
         Ok(())
     }

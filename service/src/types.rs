@@ -1,5 +1,5 @@
 use alloy_primitives::{Address, Signature};
-use dstack_sdk::dstack_client::GetQuoteResponse;
+use dstack_sdk::tappd_client::TdxQuoteResponse;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -44,7 +44,7 @@ pub struct GetReencryptRequestStatusResponse {
 
 #[derive(Serialize)]
 pub struct QuoteResponse {
-    pub quote: GetQuoteResponse,
+    pub quote: TdxQuoteResponse,
 }
 
 #[derive(Debug, Deserialize, Clone)]

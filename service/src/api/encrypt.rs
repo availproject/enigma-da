@@ -1,11 +1,13 @@
 use crate::AppState;
 use crate::error::AppError;
 use crate::types::{EncryptRequest, EncryptResponse};
+use alloy::hex;
 use alloy::signers::Signer;
 use alloy_primitives::utils::keccak256;
 use axum::{Json, extract::State, response::IntoResponse};
-use dstack_sdk::dstack_client::DstackClient;
+use dstack_sdk::dstack_client::GetKeyResponse;
 use dstack_sdk::ethereum::to_account;
+use dstack_sdk::tappd_client::TappdClient;
 
 pub async fn encrypt(
     State(state): State<AppState>,
@@ -31,16 +33,27 @@ pub async fn encrypt(
     let _guard = request_span.enter();
 
     // activate below code when run within TEE
-    let client = DstackClient::new(None);
+    let client = TappdClient::new(None);
     let key = client
-        .get_key(Some(request.app_id.to_string()), None)
+        .derive_key(request.app_id.to_string().as_str())
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to retrieve key");
             AppError::KeyGenerationError(format!("Failed to retrieve key: {}", e))
         })?;
 
-    let account = to_account(&key).map_err(|e| {
+    // Ensure key length is even (required for hex::decode)
+    let adjusted_key = key.decode_key().map_err(|e| {
+        tracing::error!(error = %e, "Failed to decode key");
+        AppError::KeyGenerationError(format!("Failed to decode key: {}", e))
+    })?;
+
+    let key_response = GetKeyResponse {
+        key: hex::encode(adjusted_key),
+        signature_chain: key.certificate_chain,
+    };
+
+    let account = to_account(&key_response).map_err(|e| {
         tracing::error!(error = %e, "Failed to convert key to account");
         AppError::KeyGenerationError(format!("Failed to convert key to account: {}", e))
     })?;

@@ -14,7 +14,7 @@ WORKDIR /usr/src/app
 COPY . .
 
 # Install dependencies and build
-RUN cargo build --release --features persistent-connection
+RUN cargo build --release
 
 # Create a smaller runtime image
 FROM debian:bookworm-slim

@@ -1670,7 +1670,7 @@ checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 [[package]]
 name = "dstack-sdk"
 version = "0.1.0"
-source = "git+https://github.com/Dstack-TEE/dstack.git#f09ad6754c32ec7ef06294c8bdb8cc93402c04d6"
+source = "git+https://github.com/Dstack-TEE/dstack.git#51b8a447e23a551aa64da05532e06f62aeac5d86"
 dependencies = [
  "alloy",
  "anyhow",
@@ -1682,6 +1682,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "x509-parser",
 ]
 
 [[package]]
