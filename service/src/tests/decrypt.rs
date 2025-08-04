@@ -5,6 +5,7 @@ use crate::config::ServiceConfig;
 use crate::db::async_store::AsyncDataStore;
 use crate::db::types::RequestStatus;
 use crate::network::async_manager::AsyncNetworkManager;
+use crate::tests::cleanup_test_files;
 use crate::tests::p2p::{kill_process, run_node};
 use crate::traits::{DataStore, NetworkManager, WorkerManager};
 use crate::types::{
@@ -71,10 +72,10 @@ async fn test_decrypt_request_endpoint() {
     };
 
     // Start P2P nodes
-    let pid1 = run_node("node1", 9000).unwrap();
-    let pid2 = run_node("node2", 9001).unwrap();
-    let pid3 = run_node("node3", 9002).unwrap();
-    let pid4 = run_node("node4", 9003).unwrap();
+    let pid1 = run_node("node1", 9100).unwrap();
+    let pid2 = run_node("node2", 9101).unwrap();
+    let pid3 = run_node("node3", 9102).unwrap();
+    let pid4 = run_node("node4", 9103).unwrap();
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     // Register the app
@@ -155,4 +156,6 @@ async fn test_decrypt_request_endpoint() {
     let _ = kill_process(pid2);
     let _ = kill_process(pid3);
     let _ = kill_process(pid4);
+
+    cleanup_test_files().await;
 }

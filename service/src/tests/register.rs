@@ -4,6 +4,7 @@ use crate::config::ServiceConfig;
 use crate::db::async_store::AsyncDataStore;
 use crate::db::types::RequestStatus;
 use crate::network::async_manager::AsyncNetworkManager;
+use crate::tests::cleanup_test_files;
 use crate::traits::{DataStore, NetworkManager, WorkerManager};
 use crate::types::RegisterAppRequest;
 use crate::worker::async_manager::AsyncWorkerManager;
@@ -131,7 +132,7 @@ async fn test_register_request_endpoint() {
     if let Some(network) = Arc::get_mut(&mut network_manager) {
         let _ = network.shutdown().await;
     }
-
+    cleanup_test_files().await;
     let _ = kill_process(pid1);
     let _ = kill_process(pid2);
     let _ = kill_process(pid3);

@@ -2,7 +2,7 @@
 name = "service"
 version = "0.1.0"
 edition = "2024"
-build = "../build.rs"
+
 
 [dependencies]
 keygen = { workspace = true }
@@ -35,11 +35,13 @@ alloy-primitives = "1.1.2"
 sled = "0.34"
 vsss_rs_std = { version = "3.0.0-pre4", package = "vsss-rs-std" }
 k256 = { workspace = true }
+kms-node = { path = "../kms-node" }
 
 [dev-dependencies]
 rstest = "0.20.0"
 http-body-util = "0.1.0"
 tempfile = {workspace = true}
+glob = "0.3"
 
 [features]
 persistent-connection = []

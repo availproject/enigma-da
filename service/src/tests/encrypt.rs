@@ -4,6 +4,7 @@ use crate::api::register::register;
 use crate::config::ServiceConfig;
 use crate::db::async_store::AsyncDataStore;
 use crate::network::async_manager::AsyncNetworkManager;
+use crate::tests::cleanup_test_files;
 use crate::traits::{DataStore, NetworkManager, WorkerManager};
 use crate::types::{EncryptRequest, EncryptResponse, RegisterAppRequest};
 use crate::worker::async_manager::AsyncWorkerManager;
@@ -120,4 +121,6 @@ async fn test_encrypt_request_endpoint() {
     let _ = kill_process(pid2);
     let _ = kill_process(pid3);
     let _ = kill_process(pid4);
+
+    cleanup_test_files().await;
 }

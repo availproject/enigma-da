@@ -4,7 +4,8 @@ members = [
     "keys",
     "proto", 
     "service",
-    "node_key_gen"
+    "node_key_gen",
+    "kms-node"
 ]
 exclude = ["enigma-kms-node"]
 resolver = "2"
