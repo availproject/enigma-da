@@ -12,7 +12,12 @@ use tracing::debug;
 pub async fn cleanup_test_files() {
     println!("🧹 Cleaning up test files...");
 
-    let key_patterns = ["peer_id_*", "p2p_store_*.db", "test_keystore_*"];
+    let key_patterns = [
+        "peer_id_*",
+        "p2p_store_*",
+        "test_keystore_*",
+        "shard_store_*",
+    ];
     for pattern in &key_patterns {
         if let Ok(entries) = glob(pattern) {
             for entry in entries {
