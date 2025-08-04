@@ -17,6 +17,10 @@ pub async fn cleanup_test_files() {
         "p2p_store_*",
         "test_keystore_*",
         "shard_store_*",
+        "./service/peer_id_*",
+        "./service/p2p_store_*",
+        "./service/test_keystore_*",
+        "./service/shard_store_*",
     ];
     for pattern in &key_patterns {
         if let Ok(entries) = glob(pattern) {
