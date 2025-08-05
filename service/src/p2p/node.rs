@@ -45,7 +45,6 @@ fn load_or_generate_keypair(node_name: &str) -> anyhow::Result<libp2p::identity:
 
 #[derive(NetworkBehaviour)]
 pub struct P2PBehaviour {
-    pub mdns: mdns::tokio::Behaviour,
     pub request_response: request_response::Behaviour<MessageProtocol>,
 }
 
@@ -110,16 +109,10 @@ impl NetworkNode {
             request_response::Config::default().with_request_timeout(Duration::from_secs(60)),
         );
 
-        // Create mDNS behaviour
-        let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), local_peer_id)?;
-
         let (command_sender, command_receiver) = mpsc::unbounded_channel();
 
         // Create network behaviour
-        let behaviour = P2PBehaviour {
-            mdns,
-            request_response,
-        };
+        let behaviour = P2PBehaviour { request_response };
 
         // Create swarm
         let mut swarm = Swarm::new(
@@ -153,7 +146,7 @@ impl NetworkNode {
     pub async fn connect_to_peer(&mut self, addr: &str) -> anyhow::Result<()> {
         info!("[{}] 🔗 Attempting to connect to: {}", self.node_name, addr);
         let addr: Multiaddr = addr.parse()?;
-
+        println!("addr: {:?}", addr);
         // Just initiate the dial - the connection will be established asynchronously
         self.swarm.dial(addr)?;
         info!("[{}] ✅ Dial request initiated", self.node_name);
@@ -395,7 +388,9 @@ impl NetworkNode {
                         SwarmEvent::ConnectionClosed { peer_id, .. } => {
                             info!("Disconnected from {}", peer_id);
                         }
-                        _ => {}
+                        e => {
+                            info!("Received event: {:?}", e);
+                        }
                     }
                 }
                 command = self.command_receiver.recv() => {

@@ -2,9 +2,9 @@ name: Cargo Test
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 env:
   CARGO_TERM_COLOR: always
@@ -14,43 +14,40 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        token: ${{ secrets.GH_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.GH_TOKEN }}
 
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: rustfmt, clippy
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
-    - name: Cache dependencies
-      uses: Swatinem/rust-cache@v2
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
 
-    - name: Check formatting
-      run: cargo fmt --all -- --check
+      - name: Check formatting
+        run: cargo fmt --all -- --check
 
-    - name: Clone Dstack-TEE/dstack repo
-      uses: actions/checkout@v4
-      with:
-        repository: Dstack-TEE/dstack
-        path: dstack
-    
-    - name: Build and Setup dstack
-      run: |
-       cd dstack/sdk/simulator && ./build.sh
-       echo "TAPPD_SIMULATOR_ENDPOINT=$(pwd)/tappd.sock" >> $GITHUB_ENV
-       ./dstack-simulator &
+      - name: Clone Dstack-TEE/dstack repo
+        uses: actions/checkout@v4
+        with:
+          repository: Dstack-TEE/dstack
+          path: dstack
 
-    - name: Build enigma kms node
-      run: |
-        cd enigma-kms-node && cargo build --features local-quote-verification
+      - name: Build and Setup dstack
+        run: |
+          cd dstack/sdk/simulator && ./build.sh
+          echo "TAPPD_SIMULATOR_ENDPOINT=$(pwd)/tappd.sock" >> $GITHUB_ENV
+          ./dstack-simulator &
 
-    - name: Build encryption service 
-      run: cargo build
+      - name: Build enigma kms node
+        run: |
+          cd enigma-kms-node && cargo build --features local-quote-verification
 
-    - name: Copy enigma kms node binary
-      run: cp enigma-kms-node/target/debug/enigma-kms-node target/debug/enigma-kms-node
+      - name: Build encryption service
+        run: cargo build
 
-    - name: Run tests
-      run: RUST_LOG=info cargo test -- --test-threads=1 --nocapture
+      - name: Run tests
+        run: RUST_LOG=info cargo test -- --test-threads=1 --nocapture

@@ -7,8 +7,6 @@
 
 use crate::p2p::node::test_ext::{NodeCommand, TestableNetworkNode};
 use crate::tests::cleanup_test_files;
-use glob::glob;
-use std::fs;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{Duration, sleep};
@@ -17,8 +15,8 @@ use tokio::time::{Duration, sleep};
 async fn test_p2p_send_shard() {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    const NODE_A_PORT: u16 = 9011;
-    const NODE_B_PORT: u16 = 9012;
+    const NODE_A_PORT: u16 = 7100;
+    const NODE_B_PORT: u16 = 7101;
     const NODE_A_NAME: &str = "node_a";
     const NODE_B_NAME: &str = "node_b";
     const APP_ID: &str = "1";

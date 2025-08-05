@@ -52,7 +52,6 @@ fn load_or_generate_keypair(node_key_path: &str) -> anyhow::Result<libp2p::ident
 
 #[derive(NetworkBehaviour)]
 pub struct P2PBehaviour {
-    pub mdns: mdns::tokio::Behaviour,
     pub request_response: request_response::Behaviour<MessageProtocol>,
 }
 
@@ -108,10 +107,7 @@ impl NetworkNode {
         let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), local_peer_id)?;
 
         // Create network behaviour
-        let behaviour = P2PBehaviour {
-            mdns,
-            request_response,
-        };
+        let behaviour = P2PBehaviour { request_response };
 
         // Create swarm
         let mut swarm = Swarm::new(
@@ -540,7 +536,7 @@ pub mod test_ext {
             shard: String,
         ) -> anyhow::Result<()> {
             println!(
-                "[{}] 🔧 send_shard method called with peer_id: {}, app_id: {}, shard_index: {}",
+                "[{}] 🔧  : {}, app_id: {}, shard_index: {}",
                 self.inner.node_name, peer_id, app_id, shard_index
             );
             let peer_id: PeerId = peer_id.parse()?;
