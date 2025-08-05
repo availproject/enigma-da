@@ -61,12 +61,15 @@ async fn test_encrypt_request_endpoint() {
         network_manager: network_manager.clone(),
         worker_manager: worker_manager.clone(),
     };
-
+    println!("Starting P2P nodes");
     // Start P2P nodes
     let pid1 = run_node("node1", 9000).unwrap();
     let pid2 = run_node("node2", 9001).unwrap();
     let pid3 = run_node("node3", 9002).unwrap();
     let pid4 = run_node("node4", 9003).unwrap();
+
+    println!("Registering app");
+
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     // Register the app first

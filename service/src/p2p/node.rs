@@ -237,6 +237,7 @@ impl NetworkNode {
                 }
             }
         };
+
         let send_shard = MessageRequest::SendShard(crate::p2p::types::SendShards {
             app_id,
             shard_index,
@@ -246,11 +247,42 @@ impl NetworkNode {
                 .map_err(|e| anyhow::anyhow!("Failed to serialize quote: {}", e))?,
         });
 
+        let p = self
+            .swarm
+            .connected_peers()
+            .map(|p| p.to_string())
+            .collect::<Vec<String>>();
+
+        println!("connected_peers: {:?}", p);
+        println!("peer_id: {:?}", peer_id);
+
+        // Check if peer is connected
+        if self
+            .swarm
+            .connected_peers()
+            .find(|p| {
+                println!("p: {:?}", p);
+                println!("peer_id: {:?}", peer_id);
+                p.to_string() == peer_id.to_string()
+            })
+            .is_some()
+        {
+            info!("[{}] ✅ Peer {} is connected", self.node_name, peer_id);
+        } else {
+            warn!("[{}] ⚠️ Peer {} is NOT connected", self.node_name, peer_id);
+        }
+
         let request_id = self
             .swarm
             .behaviour_mut()
             .request_response
             .send_request(&peer_id, send_shard.clone());
+
+        // Add detailed logging
+        info!(
+            "[{}] 🔧 Request sent with ID: {:?} to peer: {}",
+            self.node_name, request_id, peer_id
+        );
         debug!("[{}] >>> request_id >>>: {:?}", self.node_name, request_id);
         self.pending_requests
             .insert(job_id, HashMap::from([(request_id, send_shard)]));
