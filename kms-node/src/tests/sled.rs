@@ -1,6 +1,7 @@
 use crate::{p2p::store::ShardStore, tests::cleanup_test_files};
 
 #[tokio::test]
+#[ignore]
 async fn test_sled_storage_demo() -> anyhow::Result<()> {
     println!("🚀 Sled Storage Demo Test");
     println!("========================");

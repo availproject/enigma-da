@@ -1,4 +1,4 @@
-use dstack_sdk::dstack_client::GetQuoteResponse;
+use dstack_sdk::tappd_client::TdxQuoteResponse;
 pub mod quote;
 pub mod types;
 pub mod utils;
@@ -70,7 +70,7 @@ pub async fn verify_attestation(
     Ok(())
 }
 
-pub async fn verify_attestation_from_quote(quote: GetQuoteResponse) -> anyhow::Result<()> {
+pub async fn verify_attestation_from_quote(quote: TdxQuoteResponse) -> anyhow::Result<()> {
     #[cfg(any(feature = "local-quote-verification", test))]
     {
         return Ok(());

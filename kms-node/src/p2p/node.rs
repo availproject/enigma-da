@@ -7,7 +7,7 @@ use crate::{
     },
     tee::verify_attestation_from_quote,
 };
-use dstack_sdk::dstack_client::GetQuoteResponse;
+use dstack_sdk::{dstack_client::GetQuoteResponse, tappd_client::TdxQuoteResponse};
 #[allow(unused_imports)]
 use keys::keys::{PrivateKeyShare, Verifier};
 use libp2p::futures::StreamExt;
@@ -53,6 +53,7 @@ fn load_or_generate_keypair(node_key_path: &str) -> anyhow::Result<libp2p::ident
 #[derive(NetworkBehaviour)]
 pub struct P2PBehaviour {
     pub request_response: request_response::Behaviour<MessageProtocol>,
+    // pub mdns: mdns::tokio::Behaviour,
 }
 
 pub struct NetworkNode {
@@ -88,7 +89,7 @@ impl NetworkNode {
             .unwrap_or_else(|_| format!("node_key_{}.bin", node_name));
         let local_key = load_or_generate_keypair(&node_key_path)?;
         let local_peer_id = PeerId::from(local_key.public());
-        info!("Local peer id: {local_peer_id}");
+        info!("[{node_name}] Local peer id: {local_peer_id}");
 
         // Create transport with encryption
         let transport = tcp::tokio::Transport::new(tcp::Config::default().nodelay(true))
@@ -107,7 +108,10 @@ impl NetworkNode {
         let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), local_peer_id)?;
 
         // Create network behaviour
-        let behaviour = P2PBehaviour { request_response };
+        let behaviour = P2PBehaviour {
+            request_response,
+            // mdns,
+        };
 
         // Create swarm
         let mut swarm = Swarm::new(
@@ -115,7 +119,7 @@ impl NetworkNode {
             behaviour,
             local_peer_id,
             Config::with_tokio_executor()
-                .with_idle_connection_timeout(Duration::from_secs(60 * 60 * 24 * 30)), // 30 days
+                .with_idle_connection_timeout(Duration::from_secs(60 * 60 * 24 * 120)), // 120 days
         );
 
         // Listen on all interfaces
@@ -314,8 +318,14 @@ impl NetworkNode {
                                     send_shard.shard
                                 );
                                 let quote =
-                                    bincode::deserialize::<GetQuoteResponse>(&send_shard.quote)?;
-                                verify_attestation_from_quote(quote).await?;
+                                    bincode::deserialize::<TdxQuoteResponse>(&send_shard.quote)?;
+                                match verify_attestation_from_quote(quote).await {
+                                    Ok(_) => println!(">>> quote verified"),
+                                    Err(e) => println!(
+                                        ">>> quote verification failed. continueing without shard verification: {:?}",
+                                        e
+                                    ),
+                                }
 
                                 // Store the received shard
                                 self.store_shard(

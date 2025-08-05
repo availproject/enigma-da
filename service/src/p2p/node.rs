@@ -46,6 +46,7 @@ fn load_or_generate_keypair(node_name: &str) -> anyhow::Result<libp2p::identity:
 #[derive(NetworkBehaviour)]
 pub struct P2PBehaviour {
     pub request_response: request_response::Behaviour<MessageProtocol>,
+    // pub mdns: mdns::tokio::Behaviour,
 }
 
 pub struct NetworkNode {
@@ -111,8 +112,13 @@ impl NetworkNode {
 
         let (command_sender, command_receiver) = mpsc::unbounded_channel();
 
+        // let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), local_peer_id)?;
+
         // Create network behaviour
-        let behaviour = P2PBehaviour { request_response };
+        let behaviour = P2PBehaviour {
+            request_response,
+            // mdns,
+        };
 
         // Create swarm
         let mut swarm = Swarm::new(
