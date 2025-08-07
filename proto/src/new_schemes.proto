@@ -1,0 +1,15 @@
+syntax = "proto3";
+package new_schemes;
+
+enum ThresholdScheme {
+    ECIESThreshold = 0;
+    
+}
+
+enum ThresholdOperation {
+    Encryption = 0;
+   
+}
+
+
+

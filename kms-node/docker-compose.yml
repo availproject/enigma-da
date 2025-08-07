@@ -1,0 +1,31 @@
+services:
+  enigma-kms-p2p:
+    image: enigma-kms-p2p:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        FEATURE_FLAGS: "${FEATURE_FLAGS}"
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    environment:
+      # ===== TEE Quote Env Vars =====
+      PCCS_URL: "${PCCS_URL}"
+      APP_COMPOSE_HASH: "${APP_COMPOSE_HASH}"
+      EXPECTED_MR_VALUE_MRTD: "${EXPECTED_MR_VALUE_MRTD}"
+      EXPECTED_MR_VALUE_RTMR0: "${EXPECTED_MR_VALUE_RTMR0}"
+      EXPECTED_MR_VALUE_RTMR1: "${EXPECTED_MR_VALUE_RTMR1}"
+      EXPECTED_MR_VALUE_RTMR2: "${EXPECTED_MR_VALUE_RTMR2}"
+      # ===== P2P Env Vars =====
+      P2P_NODE_NAME: "${P2P_NODE_NAME}"
+      P2P_NODE_PORT: "${P2P_NODE_PORT}"
+      P2P_PROTOCOL_NAME: "${P2P_PROTOCOL_NAME}"
+      P2P_IDENTIFY_PROTOCOL_VERSION: "${P2P_IDENTIFY_PROTOCOL_VERSION}"
+      P2P_NODE_KEY_PATH: "/data/node_key.pem"
+    volumes:
+      # Mount the key file from host to container
+      - "${P2P_NODE_KEY_PATH}:/data/node_key.pem:ro"
+    ports:
+      - "${P2P_NODE_PORT}:${P2P_NODE_PORT}"
+    restart: unless-stopped

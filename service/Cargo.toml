@@ -1,0 +1,47 @@
+[package]
+name = "service"
+version = "0.1.0"
+edition = "2024"
+
+
+[dependencies]
+keygen = { workspace = true }
+keys ={workspace=true}
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+futures = { workspace = true }
+uuid = {workspace = true}
+libp2p = {workspace = true}
+anyhow = {workspace = true}
+lazy_static = {workspace = true}
+bincode = {workspace = true}
+async-trait = {workspace = true}
+axum = "0.8.4"
+dashmap = "5.5"
+ecies = "0.2"
+secp256k1 = "0.28"
+serde_bytes = "0.11"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dstack-sdk = { git = "https://github.com/Dstack-TEE/dstack.git", package = "dstack-sdk" }
+tiny-keccak = "2.0.2"
+alloy = { version = "0.15", default-features = false }
+alloy-primitives = "1.1.2"
+sled = "0.34"
+vsss_rs_std = { version = "3.0.0-pre4", package = "vsss-rs-std" }
+k256 = { workspace = true }
+kms-node = { path = "../kms-node" }
+
+[dev-dependencies]
+rstest = "0.20.0"
+http-body-util = "0.1.0"
+tempfile = {workspace = true}
+glob = "0.3"
+
+[features]
+persistent-connection = []

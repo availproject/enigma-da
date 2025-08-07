@@ -1,0 +1,18 @@
+[
+  {
+    "peer_id": "12D3KooWL3rbRMvYtoJiz8xEqsL4nsUdK46E9bFnuZjvX9NTuhPP",
+    "multiaddress": "/ip4/127.0.0.1/tcp/9000/p2p/12D3KooWL3rbRMvYtoJiz8xEqsL4nsUdK46E9bFnuZjvX9NTuhPP"
+  },
+  {
+    "peer_id": "12D3KooWP9YCShgX1gunS9EHywQEcZ85cfY3Lz1ttgfdqbYqK299",
+    "multiaddress": "/ip4/127.0.0.1/tcp/9001/p2p/12D3KooWP9YCShgX1gunS9EHywQEcZ85cfY3Lz1ttgfdqbYqK299"
+  },
+  {
+    "peer_id": "12D3KooWEwA5FXEUpj7PHUkQ8u8nQaqvTCExajEd3v7j8ikLpCGD",
+    "multiaddress": "/ip4/127.0.0.1/tcp/9002/p2p/12D3KooWEwA5FXEUpj7PHUkQ8u8nQaqvTCExajEd3v7j8ikLpCGD"
+  },
+  {
+    "peer_id": "12D3KooWBwR7Xoe3QB8F7Vs1e2iRZ1jXN9gNVjmnjEWynVddTU27",
+    "multiaddress": "/ip4/127.0.0.1/tcp/9003/p2p/12D3KooWBwR7Xoe3QB8F7Vs1e2iRZ1jXN9gNVjmnjEWynVddTU27"
+  }
+]
