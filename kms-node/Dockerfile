@@ -46,11 +46,11 @@ RUN mkdir /data && \
     chown enigma:enigma /data && \
     chmod 700 /data
 
-COPY --from=builder /usr/src/app/target/release/enigma-kms-node /data/enigma-kms-node
+COPY --from=builder /usr/src/app/target/release/kms-node /data/kms-node
 
 # Set ownership and execute permissions on the binary
-RUN chown enigma:enigma /data/enigma-kms-node && \
-    chmod +x /data/enigma-kms-node
+RUN chown enigma:enigma /data/kms-node && \
+    chmod +x /data/kms-node
 
 # Add /data to PATH so the binary can be found
 ENV PATH="/data:${PATH}"
@@ -62,4 +62,4 @@ USER enigma
 WORKDIR /data
 
 # Entrypoint
-CMD ["enigma-kms-node"]
+CMD ["kms-node"]

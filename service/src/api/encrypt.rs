@@ -79,10 +79,20 @@ pub async fn encrypt(
 
     // activate below code when run within TEE
     let message_hash = keccak256(ciphertext);
-    let signature = account.sign_hash(&message_hash).await.map_err(|e| {
+    let signature_ciphertext = account.sign_hash(&message_hash).await.map_err(|e| {
         tracing::error!(error = %e, "Failed to sign message hash");
         AppError::EncryptionError(format!("Failed to sign message hash: {}", e))
     })?;
+
+    let message_hash_plaintext = keccak256(&request.plaintext);
+    let signature_plaintext_hash =
+        account
+            .sign_hash(&message_hash_plaintext)
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "Failed to sign message hash");
+                AppError::EncryptionError(format!("Failed to sign message hash: {}", e))
+            })?;
 
     tracing::info!(
         app_id = request.app_id,
@@ -93,8 +103,11 @@ pub async fn encrypt(
 
     Ok(Json(EncryptResponse {
         ciphertext: ciphertext.to_vec(),
+        ciphertext_hash: message_hash.to_vec(),
+        plaintext_hash: message_hash_plaintext.to_vec(),
         address: account.address(),
-        signature: signature,
+        signature_ciphertext_hash: signature_ciphertext,
+        signature_plaintext_hash: signature_plaintext_hash,
         ephemeral_pub_key: ephemeral_pub_key.to_vec(),
     }))
 }
