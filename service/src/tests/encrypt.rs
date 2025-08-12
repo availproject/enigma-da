@@ -107,7 +107,8 @@ async fn test_encrypt_request_endpoint() {
     println!("Encrypt response: {:?}", response);
 
     assert!(!response.ciphertext.is_empty());
-    assert!(response.signature.r() != alloy_primitives::U256::ZERO);
+    assert!(response.signature_ciphertext_hash.r() != alloy_primitives::U256::ZERO);
+    assert!(response.signature_plaintext_hash.r() != alloy_primitives::U256::ZERO);
     assert!(!response.address.is_empty());
     assert!(!response.ephemeral_pub_key.is_empty());
 
