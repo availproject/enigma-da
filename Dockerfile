@@ -55,7 +55,7 @@ ENV DATABASE_PATH=${DATABASE_PATH}
 
 # Copy the built binaries from builder
 COPY --from=builder /usr/src/app/target/release/service /app/service
-COPY --from=builder /usr/src/app/peers.json /app/peers.json
+COPY --from=builder /usr/src/app/service/peers.json /app/peers.json
 
 # Copy and set permissions for startup script
 COPY start.sh /app/start.sh
