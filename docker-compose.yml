@@ -1,4 +1,4 @@
-services:
+ialreservices:
   encifher-service:
     # image: encifher-encryption-service:latest
     image: encifher-encryption-service-amd:latest
