@@ -7,7 +7,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::api::{
     decrypt, encrypt, get_decrypt_request_status, get_reencrypt_request_status,
-    get_register_app_request_status, quote, reencrypt, register,
+    get_register_app_request_status, health, quote, reencrypt, register,
 };
 use crate::config::ServiceConfig;
 use crate::db::async_store::AsyncDataStore;
@@ -80,6 +80,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Application routes
     let app = Router::new()
+        .route("/health", get(health))
         .route("/v1/register", post(register))
         .route("/v1/encrypt", post(encrypt))
         .route("/v1/decrypt", post(decrypt))

@@ -4,6 +4,11 @@ pub mod quote;
 pub mod reencrypt;
 pub mod register;
 
+use crate::AppState;
+use axum::Json;
+use axum::extract::State;
+use axum::response::IntoResponse;
+
 pub use decrypt::decrypt;
 pub use decrypt::get_decrypt_request_status;
 pub use encrypt::encrypt;
@@ -12,3 +17,8 @@ pub use reencrypt::get_reencrypt_request_status;
 pub use reencrypt::reencrypt;
 pub use register::get_register_app_request_status;
 pub use register::register;
+use serde_json::json;
+
+pub async fn health(State(_state): State<AppState>) -> impl IntoResponse {
+    Json(json!({ "status": "healthy" }))
+}
