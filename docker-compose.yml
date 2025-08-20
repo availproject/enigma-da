@@ -1,4 +1,4 @@
-ialreservices:
+services:
   encifher-service:
     # image: encifher-encryption-service:latest
     image: encifher-encryption-service-amd:latest
@@ -6,9 +6,9 @@ ialreservices:
     build:
       context: .
       dockerfile: Dockerfile
-      platforms:
-        - linux/amd64
-        # - linux/arm64
+    #  platforms:
+    # - linux/amd64
+    # - linux/arm64
     ports:
       - "3000:3000"
       # - "${SERVER_PORT}:${SERVER_PORT}"
