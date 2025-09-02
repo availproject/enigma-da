@@ -85,10 +85,10 @@ async fn test_reencrypt_request_endpoint() {
     };
 
     // Start P2P nodes
-    let pid1 = run_node("node1", 9000).unwrap();
-    let pid2 = run_node("node2", 9001).unwrap();
-    let pid3 = run_node("node3", 9002).unwrap();
-    let pid4 = run_node("node4", 9003).unwrap();
+    let pid1 = run_node("node_0", 9000).unwrap();
+    let pid2 = run_node("node_1", 9001).unwrap();
+    // let pid3 = run_node("node3", 9002).unwrap();
+    // let pid4 = run_node("node4", 9003).unwrap();
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     let app_id = Uuid::new_v4();
@@ -231,6 +231,6 @@ async fn test_reencrypt_request_endpoint() {
     cleanup_test_files().await;
     let _ = kill_process(pid1);
     let _ = kill_process(pid2);
-    let _ = kill_process(pid3);
-    let _ = kill_process(pid4);
+    // let _ = kill_process(pid3);
+    // let _ = kill_process(pid4);
 }

@@ -72,10 +72,10 @@ async fn test_decrypt_request_endpoint() {
     };
 
     // Start P2P nodes
-    let pid1 = run_node("node1", 9001).unwrap();
-    let pid2 = run_node("node2", 9002).unwrap();
-    let pid3 = run_node("node3", 9003).unwrap();
-    let pid4 = run_node("node4", 9004).unwrap();
+    let pid1 = run_node("node_0", 9000).unwrap();
+    let pid2 = run_node("node_1", 9001).unwrap();
+    // let pid3 = run_node("node3", 9003).unwrap();
+    // let pid4 = run_node("node4", 9004).unwrap();
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     // Register the app
@@ -155,8 +155,8 @@ async fn test_decrypt_request_endpoint() {
     // Clean up P2P processes
     let _ = kill_process(pid1);
     let _ = kill_process(pid2);
-    let _ = kill_process(pid3);
-    let _ = kill_process(pid4);
+    // let _ = kill_process(pid3);
+    // let _ = kill_process(pid4);
 
     cleanup_test_files().await;
 }

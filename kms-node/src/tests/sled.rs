@@ -1,7 +1,9 @@
+use uuid::Uuid;
+
 use crate::{p2p::store::ShardStore, tests::cleanup_test_files};
 
 #[tokio::test]
-#[ignore]
+
 async fn test_sled_storage_demo() -> anyhow::Result<()> {
     println!("🚀 Sled Storage Demo Test");
     println!("========================");
@@ -12,7 +14,7 @@ async fn test_sled_storage_demo() -> anyhow::Result<()> {
     println!("✅ ShardStore created successfully");
 
     // Store some test shards
-    let app_id = 12345;
+    let app_id = Uuid::new_v4();
     let shards = vec![
         (1, "shard_data_1".to_string()),
         (2, "shard_data_2".to_string()),
@@ -56,7 +58,7 @@ async fn test_sled_storage_demo() -> anyhow::Result<()> {
     }
 
     // Test with a different app_id
-    let app_id_2 = 67890;
+    let app_id_2 = Uuid::new_v4();
     println!("\n📝 Storing shards for app_id: {}", app_id_2);
     store
         .add_shard(app_id_2, 1, "different_app_shard".to_string())

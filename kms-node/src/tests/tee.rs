@@ -9,7 +9,7 @@ use crate::tee::{
 };
 
 #[rstest]
-#[ignore]
+
 fn test_read_report() -> anyhow::Result<()> {
     let report = fs::read_to_string("src/tests/assets/report.json")?;
     let report = serde_json::from_str::<RawReport>(&report)?;
@@ -20,7 +20,7 @@ fn test_read_report() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-#[ignore]
+
 async fn test_verify_attestation() -> anyhow::Result<()> {
     unsafe {
         std::env::set_var(

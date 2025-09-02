@@ -26,14 +26,14 @@ async fn test_p2p_send_shards() -> anyhow::Result<()> {
         .try_init();
 
     // run the network nodes
-    let node1_pid = run_node("node1", 9000)?;
-    let node2_pid = run_node("node2", 9001)?;
+    let node1_pid = run_node("node_0", 9000)?;
+    let node2_pid = run_node("node_1", 9001)?;
 
     // Wait for nodes to start up
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
 
-    let node1_peer_id = PeerId::from_str("12D3KooWRvGbxbT6idHoAWmQWRBaMM8QUb4oLREiyMQbcaVJraCd")?;
-    let node2_peer_id = PeerId::from_str("12D3KooWP9YCShgX1gunS9EHywQEcZ85cfY3Lz1ttgfdqbYqK299")?;
+    let node1_peer_id = PeerId::from_str("12D3KooWCUbypzZapH3WyPUWWiNFoWoynwpU5QgByr2DBWcajchN")?;
+    let node2_peer_id = PeerId::from_str("12D3KooWL2mQiiC3T1ovzKMzmbXjFwJktLvzYoNEekLh7Wm7ecXf")?;
 
     println!(">>> Node1 Peer ID: {}", node1_peer_id);
     println!(">>> Node2 Peer ID: {}", node2_peer_id);
@@ -104,7 +104,7 @@ async fn test_p2p_fetch_shards() -> anyhow::Result<()> {
     // Wait for nodes to start up
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
 
-    let node1_peer_id = PeerId::from_str("12D3KooWRvGbxbT6idHoAWmQWRBaMM8QUb4oLREiyMQbcaVJraCd")?;
+    let node1_peer_id = PeerId::from_str("12D3KooWL3rbRMvYtoJiz8xEqsL4nsUdK46E9bFnuZjvX9NTuhPP")?;
     let node2_peer_id = PeerId::from_str("12D3KooWP9YCShgX1gunS9EHywQEcZ85cfY3Lz1ttgfdqbYqK299")?;
 
     println!(">>> Node1 Peer ID: {}", node1_peer_id);

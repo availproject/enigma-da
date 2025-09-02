@@ -23,7 +23,6 @@ use libp2p::{
 use log::{info, warn};
 use std::fs;
 use std::path::Path;
-use uuid::Uuid;
 
 /// Load existing keypair from file or generate new one and save it
 fn load_or_generate_keypair(node_key_path: &str) -> anyhow::Result<libp2p::identity::Keypair> {
@@ -88,8 +87,6 @@ impl NetworkNode {
         // Generate identity
         let node_key_path = std::env::var("P2P_NODE_KEY_PATH")
             .unwrap_or_else(|_| format!("node_key_{}.bin", node_name));
-
-        println!("node_key_path: {}", node_key_path);
         let local_key = load_or_generate_keypair(&node_key_path)?;
         let local_peer_id = PeerId::from(local_key.public());
         info!("[{node_name}] Local peer id: {local_peer_id}");
@@ -165,7 +162,7 @@ impl NetworkNode {
                 self.node_name, app_id, shard_index
             );
         } else {
-            match app_id.parse::<Uuid>() {
+            match app_id.parse::<u32>() {
                 Ok(app_id_u32) => {
                     if let Err(e) = self.shard_store.add_shard(app_id_u32, shard_index, shard) {
                         warn!(
@@ -211,8 +208,8 @@ impl NetworkNode {
     }
 
     fn get_shard(&self, app_id: &str) -> Option<HashMap<u32, String>> {
-        match app_id.parse::<Uuid>() {
-            Ok(app_id_uuid) => match self.shard_store.get_all_shards_for_app(app_id_uuid) {
+        match app_id.parse::<u32>() {
+            Ok(app_id_u32) => match self.shard_store.get_all_shards_for_app(app_id_u32) {
                 Ok(shards) => Some(shards),
                 Err(e) => {
                     warn!(

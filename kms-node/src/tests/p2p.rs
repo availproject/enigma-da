@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use tokio::time::{Duration, sleep};
 
 #[tokio::test]
-#[ignore]
+
 async fn test_p2p_send_shard() {
     let _ = env_logger::builder().is_test(true).try_init();
 
@@ -159,7 +159,7 @@ async fn test_p2p_send_shard() {
 // Node B stores a shard first, then Node A requests it via the request-response protocol.
 // This tests the reverse flow compared to the send_shard test.
 #[tokio::test]
-#[ignore]
+
 async fn test_p2p_shard_request() {
     let _ = env_logger::builder().is_test(true).try_init();
 

@@ -1,16 +1,20 @@
-use super::p2p::{kill_process, run_node};
-use crate::api::encrypt::encrypt;
-use crate::api::register::register;
+use crate::AppState;
+use crate::api::decrypt;
+use crate::api::{encrypt, register};
 use crate::config::ServiceConfig;
 use crate::db::async_store::AsyncDataStore;
+use crate::db::types::RequestStatus;
 use crate::network::async_manager::AsyncNetworkManager;
 use crate::tests::cleanup_test_files;
+use crate::tests::p2p::{kill_process, run_node};
 use crate::traits::{DataStore, NetworkManager, WorkerManager};
-use crate::types::{EncryptRequest, EncryptResponse, RegisterAppRequest};
+use crate::types::{
+    DecryptRequest, DecryptResponse, EncryptRequest, EncryptResponse, RegisterAppRequest,
+    RegisterResponse,
+};
 use crate::worker::async_manager::AsyncWorkerManager;
-
-use crate::AppState;
-use axum::{Json, extract::State, response::IntoResponse};
+use axum::response::IntoResponse;
+use axum::{Json, extract::State};
 use http_body_util::BodyExt;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -22,13 +26,18 @@ fn get_test_db_path() -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    format!("test_keystore_encrypt_request_db_{}", timestamp)
+    format!("test_keystore_decrypt_request_db_{}", timestamp)
 }
 
 #[tokio::test]
-async fn test_encrypt_request_endpoint() {
+async fn test_decrypt_request_endpoint() {
+    //@TODO this test will run when we give shares from the nodes to the decryption service
     let _ = tracing_subscriber::fmt()
         .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("debug")
         .with_test_writer()
         .try_init();
 
@@ -61,57 +70,79 @@ async fn test_encrypt_request_endpoint() {
         network_manager: network_manager.clone(),
         worker_manager: worker_manager.clone(),
     };
-    println!("Starting P2P nodes");
+
     // Start P2P nodes
-    let pid1 = run_node("node_0", 9000).unwrap();
-    let pid2 = run_node("node_1", 9001).unwrap();
-    // let pid3 = run_node("node_2", 9002).unwrap();
-    // let pid4 = run_node("node_3", 9003).unwrap();
-
-    println!("Registering app");
-
+    let pid1 = run_node("node1", 9000).unwrap();
+    let pid2 = run_node("node2", 9001).unwrap();
+    // let pid3 = run_node("node3", 9003).unwrap();
+    // let pid4 = run_node("node4", 9004).unwrap();
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
-    // Register the app first
+    // Register the app
     let register_request = RegisterAppRequest {
         turbo_da_app_id: Uuid::new_v4(),
     };
-
     let register_response = register(State(app_state.clone()), Json(register_request.clone()))
         .await
         .unwrap();
-
     let register_response_body = register_response.into_response().into_body();
-    let register_response: crate::types::RegisterResponse =
+    let register_response: RegisterResponse =
         serde_json::from_slice(&register_response_body.collect().await.unwrap().to_bytes())
             .unwrap();
-
-    println!("Register response: {:?}", register_response);
-
-    // Wait a bit for registration to complete
+    // Wait for the job to be processed
     tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
+    let stored_job = data_store
+        .get_register_app_request(register_response.job_id)
+        .await
+        .expect("Failed to retrieve job from database");
+
+    let job_data = stored_job.unwrap();
+    assert_eq!(
+        job_data.status,
+        RequestStatus::Completed,
+        "Job should be completed"
+    );
 
     // Encrypt the plaintext
-    let request = EncryptRequest {
+    let encrypt_request = EncryptRequest {
         plaintext: vec![0; 32],
         turbo_da_app_id: register_request.turbo_da_app_id,
     };
+    let encrypt_response = encrypt(State(app_state.clone()), Json(encrypt_request.clone()))
+        .await
+        .unwrap();
+    let encrypt_response_body = encrypt_response.into_response().into_body();
+    let encrypt_response: EncryptResponse =
+        serde_json::from_slice(&encrypt_response_body.collect().await.unwrap().to_bytes()).unwrap();
 
-    let response = encrypt(State(app_state), Json(request.clone()))
+    // Decrypt the ciphertext - convert single values to arrays as expected by DecryptRequest
+    let request = DecryptRequest {
+        ciphertext: vec![encrypt_response.ciphertext],
+        ephemeral_pub_key: vec![encrypt_response.ephemeral_pub_key],
+        turbo_da_app_id: register_request.turbo_da_app_id,
+    };
+
+    let response = decrypt(State(app_state.clone()), Json(request.clone()))
         .await
         .unwrap();
 
     let response_body = response.into_response().into_body();
-    let response: EncryptResponse =
+    let response: DecryptResponse =
         serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
 
-    println!("Encrypt response: {:?}", response);
+    // Wait for the job to be processed
+    tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
 
-    assert!(!response.ciphertext.is_empty());
-    assert!(response.signature_ciphertext_hash.r() != alloy_primitives::U256::ZERO);
-    assert!(response.signature_plaintext_hash.r() != alloy_primitives::U256::ZERO);
-    assert!(!response.address.is_empty());
-    assert!(!response.ephemeral_pub_key.is_empty());
+    let stored_job = data_store
+        .get_decrypt_request(response.job_id)
+        .await
+        .expect("Failed to retrieve job from database");
+    let job_data = stored_job.unwrap();
+    assert_eq!(
+        job_data.status,
+        RequestStatus::Completed,
+        "Job should be completed"
+    );
 
     // Gracefully shutdown worker and network manager to avoid warnings
     if let Some(worker) = Arc::get_mut(&mut worker_manager) {

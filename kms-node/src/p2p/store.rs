@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use log::info;
+use uuid::Uuid;
 
 pub struct ShardStore {
     db: sled::Db,
@@ -28,7 +29,7 @@ impl ShardStore {
         Ok(ShardStore { db })
     }
 
-    pub fn add_shard(&self, app_id: u32, shard_index: u32, shard: String) -> anyhow::Result<()> {
+    pub fn add_shard(&self, app_id: Uuid, shard_index: u32, shard: String) -> anyhow::Result<()> {
         let key = format!("{}:{}", app_id, shard_index);
         self.db.insert(key.as_bytes(), shard.as_bytes())?;
         info!(
@@ -38,7 +39,7 @@ impl ShardStore {
         Ok(())
     }
 
-    pub fn get_shard(&self, app_id: u32, shard_index: u32) -> anyhow::Result<Option<String>> {
+    pub fn get_shard(&self, app_id: Uuid, shard_index: u32) -> anyhow::Result<Option<String>> {
         let key = format!("{}:{}", app_id, shard_index);
         if let Some(value) = self.db.get(key.as_bytes())? {
             let shard = String::from_utf8(value.to_vec())?;
@@ -48,7 +49,7 @@ impl ShardStore {
         }
     }
 
-    pub fn get_all_shards_for_app(&self, app_id: u32) -> anyhow::Result<HashMap<u32, String>> {
+    pub fn get_all_shards_for_app(&self, app_id: Uuid) -> anyhow::Result<HashMap<u32, String>> {
         let mut shards = HashMap::new();
         let prefix = format!("{}:", app_id);
 
@@ -66,7 +67,7 @@ impl ShardStore {
         Ok(shards)
     }
 
-    pub fn remove_shard(&self, app_id: u32, shard_index: u32) -> anyhow::Result<()> {
+    pub fn remove_shard(&self, app_id: Uuid, shard_index: u32) -> anyhow::Result<()> {
         let key = format!("{}:{}", app_id, shard_index);
         self.db.remove(key.as_bytes())?;
         Ok(())
