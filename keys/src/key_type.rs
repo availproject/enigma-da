@@ -3,6 +3,7 @@ use asn1::ParseError;
 use ecies::PublicKey;
 use k256::ProjectivePoint;
 use k256::Scalar;
+use uuid::Uuid;
 // use k256::ecdsa::signature::Verifier;
 use vsss_rs_std::PedersenVerifier;
 use vsss_rs_std::Share;
@@ -11,7 +12,7 @@ use vsss_rs_std::Share;
 pub struct ECIESPublicKey {
     pub n: u8,
     pub k: u8,
-    pub app_id: u32,
+    pub app_id: Uuid,
     pub pk: PublicKey,
 }
 impl ECIESPublicKey {
@@ -21,14 +22,14 @@ impl ECIESPublicKey {
     pub fn get_k(&self) -> u8 {
         self.k
     }
-    pub fn get_app_id(&self) -> &u32 {
+    pub fn get_app_id(&self) -> &Uuid {
         &self.app_id
     }
     pub fn get_pk(&self) -> &PublicKey {
         &self.pk
     }
 
-    pub fn new(n: u8, k: u8, pk: PublicKey, app_id: u32) -> Self {
+    pub fn new(n: u8, k: u8, pk: PublicKey, app_id: Uuid) -> Self {
         let k = Self { n, k, app_id, pk };
         k
     }
@@ -41,7 +42,7 @@ impl Serializable for ECIESPublicKey {
                 w.write_element(&(self.k as u64))?;
                 let pk_bytes = self.pk.serialize();
                 w.write_element(&pk_bytes.as_slice())?;
-                let app_id_bytes = self.app_id.to_be_bytes();
+                let app_id_bytes = self.app_id.to_bytes_le();
                 w.write_element(&app_id_bytes.as_slice())?;
 
                 Ok(())
@@ -78,7 +79,7 @@ impl Serializable for ECIESPublicKey {
                         .map_err(|_| ParseError::new(asn1::ParseErrorKind::ExtraData))?
                 };
 
-                let app_id = u32::from_be_bytes(
+                let app_id = Uuid::from_bytes_le(
                     app_id_bytes
                         .try_into()
                         .map_err(|_| ParseError::new(asn1::ParseErrorKind::ExtraData))?,
@@ -110,7 +111,7 @@ impl ECIESPrivateKey {
         self.id
     }
 
-    pub fn get_app_id(&self) -> &u32 {
+    pub fn get_app_id(&self) -> &Uuid {
         &self.pubkey.app_id
     }
 

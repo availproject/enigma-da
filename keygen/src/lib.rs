@@ -8,6 +8,7 @@ use proto::new_schemes::ThresholdScheme;
 use std::fs;
 use std::{collections::HashMap, fmt::Debug, fs::File, io::Write, path::PathBuf};
 use thiserror::Error;
+use uuid::Uuid;
 
 #[derive(Error)]
 pub enum Error {
@@ -37,7 +38,7 @@ pub fn keygen(
     a: &str,
     dir: &str,
     new: bool,
-    app_id: u32,
+    app_id: Uuid,
 ) -> Result<Vec<u8>, Error> {
     // let parts = a.split(',');
     let mut keys = HashMap::new();

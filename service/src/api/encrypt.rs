@@ -8,6 +8,7 @@ use axum::{Json, extract::State, response::IntoResponse};
 use dstack_sdk::dstack_client::GetKeyResponse;
 use dstack_sdk::ethereum::to_account;
 use dstack_sdk::tappd_client::TappdClient;
+use uuid::Uuid;
 
 pub async fn encrypt(
     State(state): State<AppState>,
@@ -15,18 +16,21 @@ pub async fn encrypt(
 ) -> Result<impl IntoResponse, AppError> {
     // Input validation
     if request.plaintext.is_empty() {
-        tracing::warn!(app_id = request.app_id, "Empty plaintext provided");
+        tracing::warn!(
+            app_id = request.turbo_da_app_id.to_string(),
+            "Empty plaintext provided"
+        );
         return Err(AppError::InvalidInput("Plaintext cannot be empty".into()));
     }
 
-    if request.app_id == 0 {
+    if request.turbo_da_app_id == Uuid::new_v4() {
         tracing::warn!("Invalid app_id: 0");
         return Err(AppError::InvalidInput("app_id cannot be 0".into()));
     }
 
     let request_span = tracing::info_span!(
         "encrypt_request",
-        app_id = request.app_id,
+        app_id = request.turbo_da_app_id.to_string(),
         plaintext_length = request.plaintext.len(),
         turbo_da_app_id = request.turbo_da_app_id.to_string()
     );
@@ -35,7 +39,7 @@ pub async fn encrypt(
     // activate below code when run within TEE
     let client = TappdClient::new(None);
     let key = client
-        .derive_key(request.app_id.to_string().as_str())
+        .derive_key(request.turbo_da_app_id.to_string().as_str())
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to retrieve key");
@@ -61,11 +65,11 @@ pub async fn encrypt(
     tracing::debug!("Retrieving public key for encryption");
     let public_key = state
         .data_store
-        .get_public_key(request.app_id)
+        .get_public_key(request.turbo_da_app_id)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to retrieve public key");
-            AppError::KeyNotFound(request.app_id)
+            AppError::KeyNotFound(request.turbo_da_app_id)
         })?;
 
     tracing::debug!("Encrypting plaintext");
@@ -95,7 +99,7 @@ pub async fn encrypt(
             })?;
 
     tracing::info!(
-        app_id = request.app_id,
+        app_id = request.turbo_da_app_id.to_string(),
         plaintext_length = request.plaintext.len(),
         ciphertext_length = ciphertext.len(),
         "Successfully encrypted data"

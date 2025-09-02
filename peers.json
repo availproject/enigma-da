@@ -1,18 +1,18 @@
 [
-    {
-        "peer_id": "12D3KooWRvGbxbT6idHoAWmQWRBaMM8QUb4oLREiyMQbcaVJraCd",
-        "multiaddress": "/ip4/178.128.153.63/tcp/9001/p2p/12D3KooWRvGbxbT6idHoAWmQWRBaMM8QUb4oLREiyMQbcaVJraCd"
-    },
-    {
-        "peer_id": "12D3KooWJXEtvExLELcgP5evz1uxmx9XfUnkxTXtJGW7XzXv6Mu1",
-        "multiaddress": "/ip4/178.128.153.63/tcp/9002/p2p/12D3KooWJXEtvExLELcgP5evz1uxmx9XfUnkxTXtJGW7XzXv6Mu1"
-    },
-    {
-        "peer_id": "12D3KooWNpt8PaCae22v3AivPyQeFG4cAe5KtPwT3YPirUgiZTkP",
-        "multiaddress": "/ip4/178.128.153.63/tcp/9003/p2p/12D3KooWNpt8PaCae22v3AivPyQeFG4cAe5KtPwT3YPirUgiZTkP"
-    },
-    {
-        "peer_id": "12D3KooWDXW62m4VAtwsYTB3s4cwH329sr67T2Mckyb2jnme9hQ4",
-        "multiaddress": "/ip4/178.128.153.63/tcp/9004/p2p/12D3KooWDXW62m4VAtwsYTB3s4cwH329sr67T2Mckyb2jnme9hQ4"
-    }
+  {
+    "peer_id": "12D3KooWRvGbxbT6idHoAWmQWRBaMM8QUb4oLREiyMQbcaVJraCd",
+    "multiaddress": "/ip4/178.128.153.63/tcp/9001/p2p/12D3KooWRvGbxbT6idHoAWmQWRBaMM8QUb4oLREiyMQbcaVJraCd"
+  },
+  {
+    "peer_id": "12D3KooWJXEtvExLELcgP5evz1uxmx9XfUnkxTXtJGW7XzXv6Mu1",
+    "multiaddress": "/ip4/178.128.153.63/tcp/9002/p2p/12D3KooWJXEtvExLELcgP5evz1uxmx9XfUnkxTXtJGW7XzXv6Mu1"
+  },
+  {
+    "peer_id": "12D3KooWNpt8PaCae22v3AivPyQeFG4cAe5KtPwT3YPirUgiZTkP",
+    "multiaddress": "/ip4/178.128.153.63/tcp/9003/p2p/12D3KooWNpt8PaCae22v3AivPyQeFG4cAe5KtPwT3YPirUgiZTkP"
+  },
+  {
+    "peer_id": "12D3KooWDXW62m4VAtwsYTB3s4cwH329sr67T2Mckyb2jnme9hQ4",
+    "multiaddress": "/ip4/178.128.153.63/tcp/9004/p2p/12D3KooWDXW62m4VAtwsYTB3s4cwH329sr67T2Mckyb2jnme9hQ4"
+  }
 ]

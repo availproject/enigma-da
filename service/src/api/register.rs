@@ -14,26 +14,36 @@ pub async fn register(
     Json(request): Json<RegisterAppRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     // Input validation
-    if request.app_id == 0 {
+    if request.turbo_da_app_id.is_nil() {
         tracing::warn!("Invalid app_id: 0");
         return Err(AppError::InvalidInput("app_id cannot be 0".into()));
     }
 
-    let request_span = tracing::info_span!("register_request", app_id = request.app_id);
+    let request_span = tracing::info_span!(
+        "register_request",
+        app_id = request.turbo_da_app_id.to_string()
+    );
     let _guard = request_span.enter();
 
     // Check if app_id is already registered
-    match state.data_store.get_public_key(request.app_id).await {
+    match state
+        .data_store
+        .get_public_key(request.turbo_da_app_id)
+        .await
+    {
         Ok(_) => {
-            tracing::warn!(app_id = request.app_id, "App ID already registered");
+            tracing::warn!(
+                app_id = request.turbo_da_app_id.to_string(),
+                "App ID already registered"
+            );
             return Ok(Json(RegisterResponse {
-                app_id: request.app_id,
+                turbo_da_app_id: request.turbo_da_app_id,
                 job_id: Uuid::from_u128(0),
             }));
         }
         Err(e) if e.to_string().contains("Public key not found") => {
             tracing::info!(
-                app_id = request.app_id,
+                app_id = request.turbo_da_app_id.to_string(),
                 "App ID not found, proceeding with registration"
             );
         }
@@ -48,7 +58,7 @@ pub async fn register(
     state
         .data_store
         .store_register_app_request(RegisterAppRequestData {
-            app_id: request.app_id.to_string(),
+            app_id: request.turbo_da_app_id.to_string(),
             job_id,
             status: RequestStatus::Pending,
             public_key: None,
@@ -61,20 +71,22 @@ pub async fn register(
 
     state
         .worker_manager
-        .send_job(JobType::RegisterApp(request.app_id, job_id))
+        .send_job(JobType::RegisterApp(request.turbo_da_app_id, job_id))
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to send register app request to worker");
             AppError::Internal(e.to_string())
         })?;
 
+    println!("no issues till here");
+
     tracing::info!(
-        app_id = request.app_id,
+        app_id = request.turbo_da_app_id.to_string(),
         "Successfully sent register app request"
     );
 
     Ok(Json(RegisterResponse {
-        app_id: request.app_id,
+        turbo_da_app_id: request.turbo_da_app_id,
         job_id: job_id,
     }))
 }

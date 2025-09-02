@@ -19,6 +19,7 @@ use std::path::Path;
 use std::{collections::HashMap, time::Duration};
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
+use uuid::Uuid;
 
 /// Load existing keypair from file or generate new one and save it
 fn load_or_generate_keypair(node_name: &str) -> anyhow::Result<libp2p::identity::Keypair> {
@@ -112,7 +113,7 @@ impl NetworkNode {
 
         let (command_sender, command_receiver) = mpsc::unbounded_channel();
 
-        // let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), local_peer_id)?;
+        let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), local_peer_id)?;
 
         // Create network behaviour
         let behaviour = P2PBehaviour {
@@ -152,7 +153,7 @@ impl NetworkNode {
     pub async fn connect_to_peer(&mut self, addr: &str) -> anyhow::Result<()> {
         info!("[{}] 🔗 Attempting to connect to: {}", self.node_name, addr);
         let addr: Multiaddr = addr.parse()?;
-        println!("addr: {:?}", addr);
+
         // Just initiate the dial - the connection will be established asynchronously
         self.swarm.dial(addr)?;
         info!("[{}] ✅ Dial request initiated", self.node_name);
@@ -170,7 +171,7 @@ impl NetworkNode {
         } else {
             if let Err(e) =
                 self.shard_store
-                    .add_shard(app_id.parse::<u32>().unwrap(), shard_index, shard)
+                    .add_shard(app_id.parse::<Uuid>().unwrap(), shard_index, shard)
             {
                 warn!(
                     "[{}] ❌ Failed to store shard for app_id: {}, shard_index: {}: {}",
@@ -188,7 +189,7 @@ impl NetworkNode {
     fn get_shard(&self, app_id: &str) -> Option<HashMap<u32, ShardData>> {
         match self
             .shard_store
-            .get_all_shards(app_id.parse::<u32>().unwrap())
+            .get_all_shards(app_id.parse::<Uuid>().unwrap())
         {
             Ok(shards) => Some(shards),
             Err(e) => {

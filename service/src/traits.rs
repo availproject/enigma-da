@@ -7,8 +7,8 @@ use uuid::Uuid;
 
 #[async_trait]
 pub trait DataStore: Send + Sync {
-    async fn get_public_key(&self, app_id: u32) -> Result<Vec<u8>, AppError>;
-    async fn store_public_key(&self, app_id: u32, public_key: &[u8]) -> Result<(), AppError>;
+    async fn get_public_key(&self, app_id: Uuid) -> Result<Vec<u8>, AppError>;
+    async fn store_public_key(&self, app_id: Uuid, public_key: &[u8]) -> Result<(), AppError>;
     async fn store_decrypt_request(&self, request: DecryptRequestData) -> Result<(), AppError>;
     async fn update_decrypt_request(
         &self,
@@ -42,20 +42,24 @@ pub trait DataStore: Send + Sync {
         &self,
         job_id: Uuid,
     ) -> Result<Option<ReencryptRequestData>, AppError>;
-    async fn get_app_peer_ids(&self, app_id: u32) -> Result<Option<Vec<String>>, AppError>;
-    async fn add_app_peer_ids(&self, app_id: u32, peer_ids: Vec<String>) -> Result<(), AppError>;
-    async fn add_shard(&self, app_id: u32, shard_index: u32, shard: String)
-    -> Result<(), AppError>;
-    async fn get_shard(&self, app_id: u32, shard_index: u32) -> Result<Option<String>, AppError>;
+    async fn get_app_peer_ids(&self, app_id: Uuid) -> Result<Option<Vec<String>>, AppError>;
+    async fn add_app_peer_ids(&self, app_id: Uuid, peer_ids: Vec<String>) -> Result<(), AppError>;
+    async fn add_shard(
+        &self,
+        app_id: Uuid,
+        shard_index: u32,
+        shard: String,
+    ) -> Result<(), AppError>;
+    async fn get_shard(&self, app_id: Uuid, shard_index: u32) -> Result<Option<String>, AppError>;
     async fn get_all_shards(
         &self,
-        app_id: u32,
+        app_id: Uuid,
     ) -> Result<std::collections::HashMap<u32, ShardData>, AppError>;
-    async fn remove_shard(&self, app_id: u32, shard_index: u32) -> Result<(), AppError>;
-    async fn list_apps(&self) -> Result<Vec<u32>, AppError>;
+    async fn remove_shard(&self, app_id: Uuid, shard_index: u32) -> Result<(), AppError>;
+    async fn list_apps(&self) -> Result<Vec<Uuid>, AppError>;
     async fn get_shard_data(
         &self,
-        app_id: u32,
+        app_id: Uuid,
         shard_index: u32,
     ) -> Result<Option<ShardData>, AppError>;
 }

@@ -7,7 +7,6 @@ use crate::db::types::{DecryptRequestData, ReencryptRequestData, RegisterAppRequ
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct EncryptRequest {
-    pub app_id: u32,
     #[serde(with = "serde_bytes")]
     pub plaintext: Vec<u8>,
     pub turbo_da_app_id: Uuid,
@@ -26,7 +25,7 @@ pub struct EncryptResponse {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct PrivateKeyRequest {
-    pub app_id: u32,
+    pub turbo_da_app_id: Uuid,
     pub public_key: Vec<u8>,
 }
 
@@ -52,12 +51,12 @@ pub struct QuoteResponse {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct RegisterAppRequest {
-    pub app_id: u32,
+    pub turbo_da_app_id: Uuid,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RegisterResponse {
-    pub app_id: u32,
+    pub turbo_da_app_id: Uuid,
     pub job_id: Uuid,
 }
 
@@ -73,7 +72,6 @@ pub struct GetRegisterAppRequestStatusResponse {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct DecryptRequest {
-    pub app_id: u32,
     pub turbo_da_app_id: Uuid,
     pub ciphertext: Vec<Vec<u8>>,
     pub ephemeral_pub_key: Vec<Vec<u8>>,

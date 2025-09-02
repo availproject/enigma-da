@@ -46,11 +46,11 @@ impl AsyncDataStore {
 
 #[async_trait]
 impl DataStoreTrait for AsyncDataStore {
-    async fn get_public_key(&self, app_id: u32) -> Result<Vec<u8>, AppError> {
+    async fn get_public_key(&self, app_id: Uuid) -> Result<Vec<u8>, AppError> {
         self.with_store(|store| store.get_public_key(app_id)).await
     }
 
-    async fn store_public_key(&self, app_id: u32, public_key: &[u8]) -> Result<(), AppError> {
+    async fn store_public_key(&self, app_id: Uuid, public_key: &[u8]) -> Result<(), AppError> {
         self.with_store(|store| store.store_public_key(app_id, public_key))
             .await
     }
@@ -124,19 +124,19 @@ impl DataStoreTrait for AsyncDataStore {
             .await
     }
 
-    async fn get_app_peer_ids(&self, app_id: u32) -> Result<Option<Vec<String>>, AppError> {
+    async fn get_app_peer_ids(&self, app_id: Uuid) -> Result<Option<Vec<String>>, AppError> {
         self.with_store(|store| store.get_app_peer_ids(app_id))
             .await
     }
 
-    async fn add_app_peer_ids(&self, app_id: u32, peer_ids: Vec<String>) -> Result<(), AppError> {
+    async fn add_app_peer_ids(&self, app_id: Uuid, peer_ids: Vec<String>) -> Result<(), AppError> {
         self.with_store(|store| store.add_app_peer_ids(app_id, peer_ids))
             .await
     }
 
     async fn add_shard(
         &self,
-        app_id: u32,
+        app_id: Uuid,
         shard_index: u32,
         shard: String,
     ) -> Result<(), AppError> {
@@ -144,30 +144,30 @@ impl DataStoreTrait for AsyncDataStore {
             .await
     }
 
-    async fn get_shard(&self, app_id: u32, shard_index: u32) -> Result<Option<String>, AppError> {
+    async fn get_shard(&self, app_id: Uuid, shard_index: u32) -> Result<Option<String>, AppError> {
         self.with_store(|store| store.get_shard(app_id, shard_index))
             .await
     }
 
     async fn get_all_shards(
         &self,
-        app_id: u32,
+        app_id: Uuid,
     ) -> Result<std::collections::HashMap<u32, ShardData>, AppError> {
         self.with_store(|store| store.get_all_shards(app_id)).await
     }
 
-    async fn remove_shard(&self, app_id: u32, shard_index: u32) -> Result<(), AppError> {
+    async fn remove_shard(&self, app_id: Uuid, shard_index: u32) -> Result<(), AppError> {
         self.with_store(|store| store.remove_shard(app_id, shard_index))
             .await
     }
 
-    async fn list_apps(&self) -> Result<Vec<u32>, AppError> {
+    async fn list_apps(&self) -> Result<Vec<Uuid>, AppError> {
         self.with_store(|store| store.list_apps()).await
     }
 
     async fn get_shard_data(
         &self,
-        app_id: u32,
+        app_id: Uuid,
         shard_index: u32,
     ) -> Result<Option<ShardData>, AppError> {
         self.with_store(|store| store.get_shard_data(app_id, shard_index))

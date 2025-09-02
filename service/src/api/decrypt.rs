@@ -14,7 +14,7 @@ pub async fn decrypt(
 ) -> Result<impl IntoResponse, AppError> {
     let request_span = tracing::info_span!(
         "decrypt_request",
-        app_id = request.app_id,
+        app_id = request.turbo_da_app_id.to_string(),
         ciphertext_length = request.ciphertext.len(),
         turbo_da_app_id = request.turbo_da_app_id.to_string()
     );
@@ -23,7 +23,7 @@ pub async fn decrypt(
     // Input validation
     if request.ciphertext.is_empty() || request.ephemeral_pub_key.is_empty() {
         tracing::warn!(
-            app_id = request.app_id,
+            app_id = request.turbo_da_app_id.to_string(),
             "Empty ciphertext or ephemeral public key"
         );
         return Err(AppError::InvalidInput(
@@ -33,7 +33,7 @@ pub async fn decrypt(
 
     let job_id = uuid::Uuid::new_v4();
     let request_data = DecryptRequestData {
-        app_id: request.app_id.to_string(),
+        app_id: request.turbo_da_app_id.to_string(),
         ciphertext_array: request.ciphertext.clone(),
         ephemeral_pub_key_array: request.ephemeral_pub_key.clone(),
         job_id,
@@ -52,14 +52,14 @@ pub async fn decrypt(
 
     tracing::debug!(
         "Attempting to decrypt ciphertext for app_id {}",
-        request.app_id
+        request.turbo_da_app_id
     );
 
     // Send the request to the worker
     state
         .worker_manager
         .send_job(JobType::DecryptJob(
-            request.app_id,
+            request.turbo_da_app_id,
             job_id,
             request.ciphertext.clone(),
             request.ephemeral_pub_key.clone(),
@@ -71,7 +71,7 @@ pub async fn decrypt(
         })?;
 
     tracing::info!(
-        app_id = request.app_id,
+        app_id = request.turbo_da_app_id.to_string(),
         job_id = job_id.to_string(),
         "Successfully sent decrypt job to worker"
     );

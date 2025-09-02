@@ -10,6 +10,7 @@ use k256::{ProjectivePoint, Scalar};
 use proto::new_schemes::{ThresholdOperation, ThresholdScheme};
 use rasn::AsnType;
 use serde::ser::SerializeSeq;
+use uuid::Uuid;
 use vsss_rs_std::{PedersenVerifier, Share};
 
 #[derive(AsnType, Clone, PartialEq, Debug)]
@@ -84,7 +85,7 @@ impl PublicKey {
             PublicKey::ECIESThreshold(pk) => pk.k,
         }
     }
-    pub fn get_app_id(&self) -> u32 {
+    pub fn get_app_id(&self) -> Uuid {
         match self {
             PublicKey::ECIESThreshold(pk) => pk.app_id.clone(),
         }
@@ -306,7 +307,7 @@ impl PrivateKeyShare {
         }
     }
 
-    pub fn get_app_id(&self) -> &u32 {
+    pub fn get_app_id(&self) -> &Uuid {
         match self {
             PrivateKeyShare::ECIESThreshold(key) => key.get_app_id(),
         }

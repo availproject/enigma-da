@@ -15,6 +15,7 @@ use ecies::utils::generate_keypair;
 use http_body_util::BodyExt;
 use rstest::rstest;
 use std::sync::Arc;
+use uuid::Uuid;
 
 // Use a unique database path for this test to avoid conflicts
 fn get_test_db_path() -> String {
@@ -90,7 +91,10 @@ async fn test_reencrypt_request_endpoint() {
     let pid4 = run_node("node4", 9003).unwrap();
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
-    let request = RegisterAppRequest { app_id: 56 };
+    let app_id = Uuid::new_v4();
+    let request = RegisterAppRequest {
+        turbo_da_app_id: app_id,
+    };
 
     let response = register(State(app_state.clone()), Json(request.clone()))
         .await
@@ -100,7 +104,7 @@ async fn test_reencrypt_request_endpoint() {
     let response: crate::types::RegisterResponse =
         serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
 
-    assert_eq!(response.app_id, request.app_id);
+    assert_eq!(response.turbo_da_app_id, request.turbo_da_app_id);
     assert!(!response.job_id.is_nil());
 
     // Verify that the job was actually created and stored in the database
@@ -120,7 +124,7 @@ async fn test_reencrypt_request_endpoint() {
     println!("📋 Job data: {:?}", job_data);
 
     // Verify job details
-    assert_eq!(job_data.app_id, request.app_id.to_string());
+    assert_eq!(job_data.app_id, request.turbo_da_app_id.to_string());
     assert_eq!(job_data.job_id, response.job_id);
     assert_eq!(job_data.status, RequestStatus::Pending);
     assert!(
@@ -147,7 +151,7 @@ async fn test_reencrypt_request_endpoint() {
     let keypair = generate_keypair();
 
     let private_key_request = PrivateKeyRequest {
-        app_id: job_data.app_id.parse().unwrap(),
+        turbo_da_app_id: job_data.app_id.parse().unwrap(),
         public_key: keypair.1.serialize().to_vec(),
     };
 
@@ -177,7 +181,10 @@ async fn test_reencrypt_request_endpoint() {
     println!("📋 Job data: {:?}", job_data);
 
     // Verify job details
-    assert_eq!(job_data.app_id, private_key_request.app_id.to_string());
+    assert_eq!(
+        job_data.app_id,
+        private_key_request.turbo_da_app_id.to_string()
+    );
     assert_eq!(job_data.job_id, response.job_id);
     assert_eq!(job_data.status, RequestStatus::Pending);
     assert!(

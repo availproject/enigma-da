@@ -7,6 +7,7 @@ use crate::db::types::{
 use anyhow::Result;
 use sled::Db;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 pub struct DataStore {
     db: Db,
@@ -45,7 +46,7 @@ impl DataStore {
         Ok(())
     }
 
-    pub fn store_public_key(&self, app_id: u32, public_key: &[u8]) -> Result<()> {
+    pub fn store_public_key(&self, app_id: Uuid, public_key: &[u8]) -> Result<()> {
         if public_key.is_empty() {
             return Err(anyhow::anyhow!("Keys cannot be empty"));
         }
@@ -62,7 +63,7 @@ impl DataStore {
         Ok(())
     }
 
-    pub fn get_public_key(&self, app_id: u32) -> Result<Vec<u8>> {
+    pub fn get_public_key(&self, app_id: Uuid) -> Result<Vec<u8>> {
         let pub_key_key = format!("{}:{app_id}", PUBLIC_KEY_PREFIX);
         match self.db.get(pub_key_key.as_bytes()) {
             Ok(Some(ivec)) => Ok(ivec.to_vec()),
@@ -72,7 +73,7 @@ impl DataStore {
     }
 
     /// Get a specific shard for an app
-    pub fn get_shard(&self, app_id: u32, shard_index: u32) -> Result<Option<String>> {
+    pub fn get_shard(&self, app_id: Uuid, shard_index: u32) -> Result<Option<String>> {
         let key = format!("{}:{}:{}", SHARD_PREFIX, app_id, shard_index);
         match self.db.get(key.as_bytes())? {
             Some(value) => {
@@ -84,7 +85,7 @@ impl DataStore {
     }
 
     /// Get a specific shard data (including timestamp) for an app
-    pub fn get_shard_data(&self, app_id: u32, shard_index: u32) -> Result<Option<ShardData>> {
+    pub fn get_shard_data(&self, app_id: Uuid, shard_index: u32) -> Result<Option<ShardData>> {
         let key = format!("{}:{}:{}", SHARD_PREFIX, app_id, shard_index);
         match self.db.get(key.as_bytes())? {
             Some(value) => {
@@ -96,7 +97,7 @@ impl DataStore {
     }
 
     /// Get all shards for an app
-    pub fn get_all_shards(&self, app_id: u32) -> Result<HashMap<u32, ShardData>> {
+    pub fn get_all_shards(&self, app_id: Uuid) -> Result<HashMap<u32, ShardData>> {
         let mut shards = HashMap::new();
 
         for i in 0..self.config.p2p.number_of_p2p_network_nodes {
@@ -110,7 +111,7 @@ impl DataStore {
     }
 
     /// Get peer IDs for an app
-    pub fn get_app_peer_ids(&self, app_id: u32) -> Result<Option<Vec<String>>> {
+    pub fn get_app_peer_ids(&self, app_id: Uuid) -> Result<Option<Vec<String>>> {
         let key = format!("{}:{}", PEER_ID_PREFIX, app_id);
         match self.db.get(key.as_bytes())? {
             Some(value) => {
@@ -122,7 +123,7 @@ impl DataStore {
     }
 
     /// Add a shard for an app
-    pub fn add_shard(&self, app_id: u32, shard_index: u32, shard: String) -> Result<()> {
+    pub fn add_shard(&self, app_id: Uuid, shard_index: u32, shard: String) -> Result<()> {
         let key = format!("{}:{}:{}", SHARD_PREFIX, app_id, shard_index);
         let shard_data = ShardData {
             app_id: app_id.to_string(),
@@ -140,7 +141,7 @@ impl DataStore {
     }
 
     /// Add peer IDs for an app
-    pub fn add_app_peer_ids(&self, app_id: u32, peer_ids: Vec<String>) -> Result<()> {
+    pub fn add_app_peer_ids(&self, app_id: Uuid, peer_ids: Vec<String>) -> Result<()> {
         let key = format!("{}:{}", PEER_ID_PREFIX, app_id);
         let peer_data = PeerIdData {
             app_id: app_id.to_string(),
@@ -161,7 +162,7 @@ impl DataStore {
     }
 
     /// Remove a specific shard
-    pub fn remove_shard(&self, app_id: u32, shard_index: u32) -> Result<()> {
+    pub fn remove_shard(&self, app_id: Uuid, shard_index: u32) -> Result<()> {
         let key = format!("{}:{}:{}", SHARD_PREFIX, app_id, shard_index);
         self.db.remove(key.as_bytes())?;
         self.maybe_flush()?;
@@ -169,7 +170,7 @@ impl DataStore {
     }
 
     /// Remove all data for an app (both shards and peer IDs)
-    pub fn remove_app(&self, app_id: u32) -> Result<()> {
+    pub fn remove_app(&self, app_id: Uuid) -> Result<()> {
         // Remove all shards for this app
         let shard_prefix = format!("{}:{}:", SHARD_PREFIX, app_id);
         for result in self.db.scan_prefix(shard_prefix.as_bytes()) {
@@ -276,14 +277,14 @@ impl DataStore {
     }
 
     /// List all app IDs that have stored data
-    pub fn list_apps(&self) -> Result<Vec<u32>> {
+    pub fn list_apps(&self) -> Result<Vec<Uuid>> {
         let mut apps = std::collections::HashSet::new();
 
         // Get apps from shard data
         for result in self.db.scan_prefix(SHARD_PREFIX.as_bytes()) {
             let (_, value) = result?;
             if let Ok(shard_data) = bincode::deserialize::<ShardData>(&value) {
-                apps.insert(shard_data.app_id.parse::<u32>()?);
+                apps.insert(shard_data.app_id.parse::<Uuid>()?);
             }
         }
 
@@ -291,7 +292,7 @@ impl DataStore {
         for result in self.db.scan_prefix(PEER_ID_PREFIX.as_bytes()) {
             let (_, value) = result?;
             if let Ok(peer_data) = bincode::deserialize::<PeerIdData>(&value) {
-                apps.insert(peer_data.app_id.parse::<u32>()?);
+                apps.insert(peer_data.app_id.parse::<Uuid>()?);
             }
         }
 

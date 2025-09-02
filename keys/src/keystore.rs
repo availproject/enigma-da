@@ -6,10 +6,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct KeyEntry {
-    pub id: u32,
+    pub id: Uuid,
     pub(crate) is_default: bool,
     pub sk: Option<PrivateKeyShare>,
     pub pk: PublicKey,
@@ -40,13 +41,13 @@ impl KeyEntry {
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct KeyStore {
-    key_entries: HashMap<u32, KeyEntry>,
+    key_entries: HashMap<Uuid, KeyEntry>,
     filename: Option<PathBuf>,
 }
 
 #[derive(Serialize, Deserialize)]
 struct SerializedKeyEntry {
-    pub id: u32,
+    pub id: Uuid,
     pub key_type: String,
     pub scheme: String,
     pub operation: String,
@@ -187,7 +188,7 @@ impl KeyStore {
     // }
 
     //insert privatekeyshare to a keystore
-    pub fn insert_private_key(&mut self, key: PrivateKeyShare) -> Result<u32, KeyStoreError> {
+    pub fn insert_private_key(&mut self, key: PrivateKeyShare) -> Result<Uuid, KeyStoreError> {
         let app_id = key.clone().get_app_id().clone();
 
         if self
@@ -199,7 +200,7 @@ impl KeyStore {
         }
 
         let operation = key.get_scheme().get_operation();
-        let matching_keys: Vec<(&u32, &mut KeyEntry)> = self
+        let matching_keys: Vec<(&Uuid, &mut KeyEntry)> = self
             .key_entries
             .iter_mut()
             .filter(|e| {
@@ -236,7 +237,7 @@ impl KeyStore {
         &mut self,
         key: &PrivateKeyShare,
         verifier: Verifier,
-    ) -> Result<u32, KeyStoreError> {
+    ) -> Result<Uuid, KeyStoreError> {
         let app_id = key.get_app_id();
         if self
             .key_entries
@@ -258,7 +259,7 @@ impl KeyStore {
         Ok(*app_id)
     }
 
-    pub fn insert_public_key(&mut self, key: PublicKey) -> Result<u32, KeyStoreError> {
+    pub fn insert_public_key(&mut self, key: PublicKey) -> Result<Uuid, KeyStoreError> {
         let app_id = key.get_app_id();
 
         if self.key_entries.iter().any(|e| e.0.eq(&app_id)) {
@@ -285,7 +286,7 @@ impl KeyStore {
     }
 
     // Return the matching key with the given app_id, or an error if no key with app_id exists.
-    pub fn get_key_by_id(&self, id: &u32) -> Result<KeyEntry, KeyStoreError> {
+    pub fn get_key_by_id(&self, id: &Uuid) -> Result<KeyEntry, KeyStoreError> {
         if self.key_entries.contains_key(id) == false {
             error!("No entry for id {}", &id);
             return Err(KeyStoreError::IdNotFound(*id));

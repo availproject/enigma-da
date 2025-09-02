@@ -4,6 +4,7 @@ use crypto_bigint::rand_core::CryptoRngCore;
 use k256::ProjectivePoint;
 use k256::Scalar;
 use proto::new_schemes::ThresholdScheme;
+use uuid::Uuid;
 use vsss_rs_std::pedersen;
 pub struct KeyGenerator {}
 
@@ -13,7 +14,7 @@ impl KeyGenerator {
         t: u8,
         mut rng: &mut impl CryptoRngCore,
         scheme: &ThresholdScheme,
-        app_id: u32,
+        app_id: Uuid,
     ) -> Result<(Vec<PrivateKeyShare>, Vec<Verifier>), Box<dyn std::error::Error>> {
         match scheme {
             ThresholdScheme::ECIESThreshold => {
@@ -70,7 +71,7 @@ mod tests {
         let n = 5u8;
         let t = 3u8;
         let scheme = ThresholdScheme::ECIESThreshold;
-        let app_id: u32 = 1234;
+        let app_id: Uuid = Uuid::new_v4();
 
         let (private_keys_share, verifiers) =
             KeyGenerator::generate_keys(n, t, &mut rng, &scheme, app_id)
@@ -101,7 +102,7 @@ mod tests {
         let n = 5u8;
         let t = 3u8;
         let scheme = ThresholdScheme::ECIESThreshold;
-        let app_id: u32 = 1234;
+        let app_id: Uuid = Uuid::new_v4();
 
         let (_private_keys_share, _verifiers) =
             generate_keys(n, t, &mut rng, &scheme, app_id).expect("Failed to generate keys");
@@ -111,7 +112,7 @@ mod tests {
         t: u8,
         mut rng: &mut impl CryptoRngCore,
         scheme: &ThresholdScheme,
-        app_id: u32,
+        app_id: Uuid,
     ) -> Result<(Vec<PrivateKeyShare>, Vec<Verifier>), Box<dyn std::error::Error>> {
         match scheme {
             ThresholdScheme::ECIESThreshold => {

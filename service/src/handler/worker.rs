@@ -16,6 +16,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Peer {
@@ -33,10 +34,10 @@ const PEERS_FILE: &str = "peers.json";
 
 #[derive(Debug, Clone)]
 pub enum JobType {
-    RegisterApp(u32, uuid::Uuid), // app_id, job_id
-    DecryptJob(u32, uuid::Uuid, Vec<Vec<u8>>, Vec<Vec<u8>>), // app_id, job_id, encrypted_data, ephemeral_pub_key
-    ReencryptJob(u32, uuid::Uuid, Vec<u8>),                  // app_id, job_id, public_key
-    CleanupShards,                                           // Cleanup job for old shards
+    RegisterApp(Uuid, uuid::Uuid), // app_id, job_id
+    DecryptJob(Uuid, uuid::Uuid, Vec<Vec<u8>>, Vec<Vec<u8>>), // app_id, job_id, encrypted_data, ephemeral_pub_key
+    ReencryptJob(Uuid, uuid::Uuid, Vec<u8>),                  // app_id, job_id, public_key
+    CleanupShards,                                            // Cleanup job for old shards
 }
 
 // Constants are now defined in ServiceConfig and accessed via config parameter
@@ -212,7 +213,7 @@ impl JobWorker {
 
     pub async fn handle_reencrypt_job(
         &mut self,
-        app_id: u32,
+        app_id: Uuid,
         job_id: uuid::Uuid,
         k: u32,
         public_key: Vec<u8>,
@@ -297,7 +298,7 @@ impl JobWorker {
 
     pub async fn handle_decrypt_job(
         &mut self,
-        app_id: u32,
+        app_id: Uuid,
         job_id: uuid::Uuid,
         k: u32,
         encrypted_data: Vec<Vec<u8>>,
@@ -402,7 +403,7 @@ impl JobWorker {
 
     async fn handle_register_app_job(
         &mut self,
-        app_id: u32,
+        turbo_da_app_id: Uuid,
         job_id: uuid::Uuid,
         peers: &Vec<Peer>,
         n: u32,
@@ -410,31 +411,46 @@ impl JobWorker {
     ) -> Result<(), anyhow::Error> {
         tracing::info!(
             "Handling register app job for app_id: {}, job_id: {}",
-            app_id,
+            turbo_da_app_id,
             job_id
         );
         let public_key = keygen(
             k as u16,
             n as u16,
             "ECIESThreshold",
-            format!("./conf/{}", app_id).as_str(),
+            format!("./conf/{}", turbo_da_app_id).as_str(),
             true,
-            app_id,
+            turbo_da_app_id,
         )?;
+
         self.data_store
-            .store_public_key(app_id, &public_key)
+            .store_public_key(turbo_da_app_id, &public_key)
             .await?;
         self.data_store
-            .add_app_peer_ids(app_id, peers.iter().map(|p| p.peer_id.clone()).collect())
+            .add_app_peer_ids(
+                turbo_da_app_id,
+                peers.iter().map(|p| p.peer_id.clone()).collect(),
+            )
             .await?;
 
         // read the shards
-        let shards = read_shards(app_id)?;
+        let shards = read_shards(turbo_da_app_id)?;
+
         for (i, peer_id) in peers.iter().enumerate() {
+            println!(
+                "{:?}",
+                NodeCommand::SendShard {
+                    peer_id: peer_id.peer_id.clone(),
+                    app_id: turbo_da_app_id.to_string(),
+                    shard_index: i as u32,
+                    shard: shards[i].clone(),
+                    job_id,
+                }
+            );
             self.network_manager
                 .send_command(NodeCommand::SendShard {
                     peer_id: peer_id.peer_id.clone(),
-                    app_id: app_id.to_string(),
+                    app_id: turbo_da_app_id.to_string(),
                     shard_index: i as u32,
                     shard: shards[i].clone(),
                     job_id,
@@ -442,6 +458,7 @@ impl JobWorker {
                 .await?;
         }
 
+        println!("definitely working till herte");
         // Wait for request to be completed
         while let Some((pending, _)) = self.network_manager.get_request_status(job_id).await {
             if pending == 0 {
@@ -455,7 +472,7 @@ impl JobWorker {
             if self.retry_count > self.config.worker.shard_request_retry_count {
                 tracing::warn!(
                     "All shards are not sent for app_id: {}, job_id: {}.[IMPORTANT] This can be a false alarm",
-                    app_id,
+                    turbo_da_app_id,
                     job_id
                 );
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
@@ -472,7 +489,7 @@ impl JobWorker {
             .update_register_app_request(
                 job_id,
                 RegisterAppRequestData {
-                    app_id: app_id.to_string(),
+                    app_id: turbo_da_app_id.to_string(),
                     job_id,
                     status: RequestStatus::Completed,
                     public_key: Some(public_key),
@@ -480,7 +497,7 @@ impl JobWorker {
             )
             .await?;
 
-        delete_shards(app_id)?;
+        delete_shards(turbo_da_app_id)?;
 
         Ok(())
     }
@@ -553,7 +570,7 @@ fn load_json_array() -> Vec<Peer> {
     serde_json::from_str(&data).expect("Failed to parse peers.json as JSON array")
 }
 
-fn read_shards(app_id: u32) -> Result<Vec<String>, anyhow::Error> {
+fn read_shards(app_id: Uuid) -> Result<Vec<String>, anyhow::Error> {
     let mut shards = Vec::new();
     for i in 0..*N {
         let path = format!("./conf/{}/node{}.keystore", app_id, i + 1);
@@ -588,7 +605,7 @@ fn convert_shards_to_key(shards: Vec<String>, k: u32) -> Result<SecretKey, anyho
         .map_err(|_| anyhow::anyhow!("Failed to reconstruct ECIES SecretKey from scalar"))?)
 }
 
-fn delete_shards(app_id: u32) -> Result<(), anyhow::Error> {
+fn delete_shards(app_id: Uuid) -> Result<(), anyhow::Error> {
     for i in 0..*N {
         let path = format!("./conf/{}/node{}.keystore", app_id, i + 1);
         let _ = fs::remove_file(path);

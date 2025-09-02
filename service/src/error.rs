@@ -6,6 +6,7 @@ use axum::{
 use serde::Serialize;
 use std::io;
 use thiserror::Error;
+use uuid::Uuid;
 
 #[derive(Error, Debug)]
 pub enum AppError {
@@ -18,7 +19,7 @@ pub enum AppError {
     #[error("Key generation error: {0}")]
     KeyGenerationError(String),
     #[error("Key not found for app_id: {0}")]
-    KeyNotFound(u32),
+    KeyNotFound(Uuid),
     #[error("Decrypt request not found: {0}")]
     RequestNotFound(String),
     #[error("request not found: {0}")]

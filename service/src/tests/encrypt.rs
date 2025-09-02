@@ -73,7 +73,9 @@ async fn test_encrypt_request_endpoint() {
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     // Register the app first
-    let register_request = RegisterAppRequest { app_id: 234 };
+    let register_request = RegisterAppRequest {
+        turbo_da_app_id: Uuid::new_v4(),
+    };
 
     let register_response = register(State(app_state.clone()), Json(register_request.clone()))
         .await
@@ -91,9 +93,8 @@ async fn test_encrypt_request_endpoint() {
 
     // Encrypt the plaintext
     let request = EncryptRequest {
-        app_id: 234,
         plaintext: vec![0; 32],
-        turbo_da_app_id: Uuid::new_v4(),
+        turbo_da_app_id: register_request.turbo_da_app_id,
     };
 
     let response = encrypt(State(app_state), Json(request.clone()))

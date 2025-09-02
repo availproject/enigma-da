@@ -5,6 +5,8 @@ pub mod keys;
 pub mod keystore;
 pub mod scheme_types_imp;
 use std::fmt::{self, Debug, Display};
+
+use uuid::Uuid;
 #[macro_export]
 macro_rules! unwrap_enum_vec {
     ($vec:expr, $variant:path, $err:expr) => {{
@@ -23,9 +25,9 @@ macro_rules! unwrap_enum_vec {
 }
 
 pub enum KeyStoreError {
-    DuplicateEntry(u32),
+    DuplicateEntry(Uuid),
     IdMismatch,
-    IdNotFound(u32),
+    IdNotFound(Uuid),
 }
 
 impl Display for KeyStoreError {

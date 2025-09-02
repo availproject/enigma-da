@@ -72,14 +72,16 @@ async fn test_decrypt_request_endpoint() {
     };
 
     // Start P2P nodes
-    let pid1 = run_node("node1", 9000).unwrap();
-    let pid2 = run_node("node2", 9001).unwrap();
-    let pid3 = run_node("node3", 9002).unwrap();
-    let pid4 = run_node("node4", 9003).unwrap();
+    let pid1 = run_node("node1", 9001).unwrap();
+    let pid2 = run_node("node2", 9002).unwrap();
+    let pid3 = run_node("node3", 9003).unwrap();
+    let pid4 = run_node("node4", 9004).unwrap();
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     // Register the app
-    let register_request = RegisterAppRequest { app_id: 321 };
+    let register_request = RegisterAppRequest {
+        turbo_da_app_id: Uuid::new_v4(),
+    };
     let register_response = register(State(app_state.clone()), Json(register_request.clone()))
         .await
         .unwrap();
@@ -93,6 +95,7 @@ async fn test_decrypt_request_endpoint() {
         .get_register_app_request(register_response.job_id)
         .await
         .expect("Failed to retrieve job from database");
+
     let job_data = stored_job.unwrap();
     assert_eq!(
         job_data.status,
@@ -102,9 +105,8 @@ async fn test_decrypt_request_endpoint() {
 
     // Encrypt the plaintext
     let encrypt_request = EncryptRequest {
-        app_id: 321,
         plaintext: vec![0; 32],
-        turbo_da_app_id: Uuid::new_v4(),
+        turbo_da_app_id: register_request.turbo_da_app_id,
     };
     let encrypt_response = encrypt(State(app_state.clone()), Json(encrypt_request.clone()))
         .await
@@ -115,10 +117,9 @@ async fn test_decrypt_request_endpoint() {
 
     // Decrypt the ciphertext - convert single values to arrays as expected by DecryptRequest
     let request = DecryptRequest {
-        app_id: 321,
         ciphertext: vec![encrypt_response.ciphertext],
         ephemeral_pub_key: vec![encrypt_response.ephemeral_pub_key],
-        turbo_da_app_id: Uuid::new_v4(),
+        turbo_da_app_id: register_request.turbo_da_app_id,
     };
 
     let response = decrypt(State(app_state.clone()), Json(request.clone()))

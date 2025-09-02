@@ -14,7 +14,7 @@ pub async fn reencrypt(
 ) -> Result<impl IntoResponse, AppError> {
     let request_span = tracing::info_span!(
         "reencrypt",
-        app_id = request.app_id,
+        app_id = request.turbo_da_app_id.to_string(),
         public_key_length = request.public_key.len()
     );
     let _guard = request_span.enter();
@@ -25,7 +25,7 @@ pub async fn reencrypt(
 
     let job_id = uuid::Uuid::new_v4();
     let request_data = ReencryptRequestData {
-        app_id: request.app_id.to_string(),
+        app_id: request.turbo_da_app_id.to_string(),
         job_id,
         status: RequestStatus::Pending,
         ephemeral_pub_key: None,
@@ -44,7 +44,7 @@ pub async fn reencrypt(
     state
         .worker_manager
         .send_job(JobType::ReencryptJob(
-            request.app_id,
+            request.turbo_da_app_id,
             job_id,
             request.public_key,
         ))
@@ -55,7 +55,7 @@ pub async fn reencrypt(
         })?;
 
     tracing::info!(
-        app_id = request.app_id,
+        app_id = request.turbo_da_app_id.to_string(),
         job_id = job_id.to_string(),
         "Successfully sent reencrypt job to worker"
     );
