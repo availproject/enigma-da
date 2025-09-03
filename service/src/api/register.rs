@@ -6,6 +6,7 @@ use crate::types::{
     GetRegisterAppRequestStatusRequest, GetRegisterAppRequestStatusResponse, RegisterAppRequest,
     RegisterResponse,
 };
+use axum::extract::Query;
 use axum::{Json, extract::State, response::IntoResponse};
 use uuid::Uuid;
 
@@ -93,7 +94,7 @@ pub async fn register(
 
 pub async fn get_register_app_request_status(
     State(state): State<AppState>,
-    Json(request): Json<GetRegisterAppRequestStatusRequest>,
+    Query(request): Query<GetRegisterAppRequestStatusRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let request_span = tracing::info_span!(
         "get_register_app_request_status",

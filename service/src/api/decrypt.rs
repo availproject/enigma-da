@@ -6,6 +6,7 @@ use crate::types::{
     DecryptRequest, DecryptResponse, GetDecryptRequestStatusRequest,
     GetDecryptRequestStatusResponse,
 };
+use axum::extract::Query;
 use axum::{Json, extract::State, response::IntoResponse};
 
 pub async fn decrypt(
@@ -81,7 +82,7 @@ pub async fn decrypt(
 
 pub async fn get_decrypt_request_status(
     State(state): State<AppState>,
-    Json(request): Json<GetDecryptRequestStatusRequest>,
+    Query(request): Query<GetDecryptRequestStatusRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let request_span = tracing::info_span!(
         "get_decrypt_request_status",

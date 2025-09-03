@@ -418,10 +418,9 @@ impl NetworkNode {
                             if response.success {
                                 if let Some(shard) = &response.shard {
                                     info!(
-                                        "[{}] ✅ Shard received: {:?} (Request: {:?})",
+                                        "[{}] ✅ Shard received: {:?})",
                                         self.node_name,
                                         String::from_utf8_lossy(shard),
-                                        original_request
                                     );
                                     // Try to deserialize and store the received shard
                                     match bincode::deserialize::<HashMap<u32, String>>(shard) {
