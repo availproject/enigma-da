@@ -1,10 +1,10 @@
 [
   {
     "peer_id": "12D3KooWEF2LWdW1ryavFBLaxiw8FvRscBJgq6kXQat7aKDMKXkR",
-    "multiaddress": "/ip4/127.0.0.1/tcp/9000/p2p/12D3KooWEF2LWdW1ryavFBLaxiw8FvRscBJgq6kXQat7aKDMKXkR"
+    "multiaddress": "/ip4/178.128.153.63/tcp/9000/p2p/12D3KooWEF2LWdW1ryavFBLaxiw8FvRscBJgq6kXQat7aKDMKXkR"
   },
   {
     "peer_id": "12D3KooWHMGWfjSriKhemz26dQAouhgYgkZ8EajerGCTzwwHggk3",
-    "multiaddress": "/ip4/127.0.0.1/tcp/9001/p2p/12D3KooWHMGWfjSriKhemz26dQAouhgYgkZ8EajerGCTzwwHggk3"
+    "multiaddress": "/ip4/178.128.153.63/tcp/9001/p2p/12D3KooWHMGWfjSriKhemz26dQAouhgYgkZ8EajerGCTzwwHggk3"
   }
 ]
