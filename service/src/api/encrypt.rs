@@ -36,6 +36,7 @@ pub async fn encrypt(Json(request): Json<EncryptRequest>) -> Result<impl IntoRes
     let account = get_key(request.turbo_da_app_id).await?;
     let decryption_key = account.credential().to_bytes().to_vec();
 
+    tracing::info!("Decryption key: {}", hex::encode(decryption_key.clone()));
     let public_key = account
         .credential()
         .verifying_key()

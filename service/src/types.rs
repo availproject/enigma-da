@@ -21,30 +21,9 @@ pub struct EncryptResponse {
     pub ephemeral_pub_key: Vec<u8>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct GetReencryptRequestStatusRequest {
-    pub job_id: Uuid,
-}
-
 #[derive(Serialize)]
 pub struct QuoteResponse {
     pub quote: GetQuoteResponse,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct RegisterAppRequest {
-    pub turbo_da_app_id: Uuid,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RegisterResponse {
-    pub turbo_da_app_id: Uuid,
-    pub job_id: Uuid,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct GetRegisterAppRequestStatusRequest {
-    pub job_id: Uuid,
 }
 
 #[derive(Debug, Deserialize, Clone)]

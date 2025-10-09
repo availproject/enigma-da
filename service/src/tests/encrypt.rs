@@ -1,22 +1,11 @@
-use crate::AppState;
 use crate::api::encrypt::encrypt;
-use crate::config::ServiceConfig;
-use crate::tests::cleanup_test_files;
-use crate::types::{EncryptRequest, EncryptResponse, RegisterAppRequest};
-use axum::{Json, extract::State, response::IntoResponse};
-use http_body_util::BodyExt;
-use std::sync::Arc;
-use uuid::Uuid;
 
-// Use a unique database path for this test to avoid conflicts
-fn get_test_db_path() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    format!("test_keystore_encrypt_request_db_{}", timestamp)
-}
+use crate::tests::cleanup_test_files;
+use crate::types::{EncryptRequest, EncryptResponse};
+use axum::{Json, response::IntoResponse};
+use http_body_util::BodyExt;
+
+use uuid::Uuid;
 
 #[tokio::test]
 async fn test_encrypt_request_endpoint() {
