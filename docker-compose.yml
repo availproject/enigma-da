@@ -1,8 +1,7 @@
 services:
-  encifher-service:
-    # image: encifher-encryption-service:latest
-    image: encifher-encryption-service-amd:latest
-    container_name: encifher-encryption-service
+  enigma-da-service:
+    image: enigma-da-service:latest
+    container_name: enigma-da-service
     build:
       context: .
       dockerfile: Dockerfile
@@ -18,19 +17,6 @@ services:
       RUST_BACKTRACE: 1
       SERVER_PORT: ${SERVER_PORT}
       SERVER_HOST: ${SERVER_HOST}
-      # P2P Config
-      P2P_PORT: ${P2P_PORT}
-      P2P_NODE_NAME: ${P2P_NODE_NAME}
-      P2P_PROTOCOL_NAME: ${P2P_PROTOCOL_NAME}
-      P2P_IDENTIFY_PROTOCOL_VERSION: ${P2P_IDENTIFY_PROTOCOL_VERSION}
-      NUMBER_OF_P2P_NETWORK_NODES: ${NUMBER_OF_P2P_NETWORK_NODES}
-      # Worker Config
-      SHARD_REQUEST_INTERVAL_SECS: ${SHARD_REQUEST_INTERVAL_SECS}
-      SHARD_REQUEST_RETRY_COUNT: ${SHARD_REQUEST_RETRY_COUNT}
-      SHARD_CLEANUP_INTERVAL_HOURS: ${SHARD_CLEANUP_INTERVAL_HOURS}
-      JOB_QUEUE_SIZE: ${JOB_QUEUE_SIZE}
-      # Database Config
-      DATABASE_PATH: ${DATABASE_PATH}
     volumes:
-      - /var/run/tappd.sock:/var/run/tappd.sock
+      - /var/run/dstack.sock:/var/run/dstack.sock
     command: ["/app/start.sh"]
