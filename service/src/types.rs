@@ -1,9 +1,7 @@
 use alloy_primitives::{Address, Signature};
-use dstack_sdk::tappd_client::TdxQuoteResponse;
+use dstack_sdk::dstack_client::GetQuoteResponse;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-
-use crate::db::types::{DecryptRequestData, ReencryptRequestData, RegisterAppRequestData};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct EncryptRequest {
@@ -23,30 +21,14 @@ pub struct EncryptResponse {
     pub ephemeral_pub_key: Vec<u8>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct PrivateKeyRequest {
-    pub turbo_da_app_id: Uuid,
-    pub public_key: Vec<u8>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PrivateKeyResponse {
-    pub job_id: Uuid,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct GetReencryptRequestStatusRequest {
     pub job_id: Uuid,
 }
 
-#[derive(Debug, Serialize)]
-pub struct GetReencryptRequestStatusResponse {
-    pub request: ReencryptRequestData,
-}
-
 #[derive(Serialize)]
 pub struct QuoteResponse {
-    pub quote: TdxQuoteResponse,
+    pub quote: GetQuoteResponse,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -65,16 +47,11 @@ pub struct GetRegisterAppRequestStatusRequest {
     pub job_id: Uuid,
 }
 
-#[derive(Debug, Serialize)]
-pub struct GetRegisterAppRequestStatusResponse {
-    pub request: RegisterAppRequestData,
-}
-
 #[derive(Debug, Deserialize, Clone)]
 pub struct DecryptRequest {
     pub turbo_da_app_id: Uuid,
-    pub ciphertext: Vec<Vec<u8>>,
-    pub ephemeral_pub_key: Vec<Vec<u8>>,
+    pub ciphertext: Vec<u8>,
+    pub ephemeral_pub_key: Vec<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -85,9 +62,4 @@ pub struct DecryptResponse {
 #[derive(Debug, Deserialize)]
 pub struct GetDecryptRequestStatusRequest {
     pub job_id: Uuid,
-}
-
-#[derive(Debug, Serialize)]
-pub struct GetDecryptRequestStatusResponse {
-    pub request: DecryptRequestData,
 }

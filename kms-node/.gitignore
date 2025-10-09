@@ -1,4 +1,0 @@
-/target
-node_key_*.bin
-shard_store_*_db
-.env

@@ -5,37 +5,21 @@ use axum::{
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
 
-use crate::api::{
-    decrypt, encrypt, get_decrypt_request_status, get_reencrypt_request_status,
-    get_register_app_request_status, health, quote, reencrypt, register,
-};
+use crate::api::{decrypt, encrypt, health, quote};
 use crate::config::ServiceConfig;
-use crate::db::async_store::AsyncDataStore;
-use crate::network::async_manager::AsyncNetworkManager;
 use crate::tracer::{TracingConfig, init_tracer};
-use crate::traits::{DataStore, NetworkManager, WorkerManager};
-use crate::worker::async_manager::AsyncWorkerManager;
 
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<ServiceConfig>,
-    pub data_store: Arc<dyn DataStore + Send + Sync>,
-    pub network_manager: Arc<dyn NetworkManager + Send + Sync>,
-    pub worker_manager: Arc<dyn WorkerManager + Send + Sync>,
 }
-
 pub mod api;
 pub mod config;
-pub mod db;
+
 pub mod error;
-pub mod handler;
-pub mod network;
-pub mod network_manager;
-pub mod p2p;
 pub mod tracer;
-pub mod traits;
 pub mod types;
-pub mod worker;
+pub mod utils;
 
 #[cfg(test)]
 mod tests;
@@ -48,47 +32,19 @@ async fn main() -> anyhow::Result<()> {
     // Load configuration
     let config = ServiceConfig::from_env();
 
-    // Initialize async components with trait objects
-    let data_store: Arc<dyn DataStore + Send + Sync> = Arc::new(
-        AsyncDataStore::from_path(&config.database.path, config.clone())
-            .expect("Failed to create async data store"),
-    );
     tracing::info!("Data store initialized");
-    let network_manager: Arc<dyn NetworkManager + Send + Sync> = Arc::new(
-        AsyncNetworkManager::from_config(
-            config.p2p.port,
-            config.p2p.node_name.clone(),
-            config.clone(),
-        )
-        .await
-        .expect("Failed to create async network manager"),
-    );
-    tracing::info!("Network manager initialized");
-    let worker_manager: Arc<dyn WorkerManager + Send + Sync> = Arc::new(
-        AsyncWorkerManager::new(data_store.clone(), network_manager.clone(), &config.clone())
-            .expect("Failed to create async worker manager"),
-    );
-    tracing::info!("Worker manager initialized");
 
     // Create application state with async trait objects
     let app_state = AppState {
         config: Arc::new(config.clone()),
-        data_store,
-        network_manager,
-        worker_manager,
     };
 
     // Application routes
     let app = Router::new()
         .route("/health", get(health))
-        .route("/v1/register", post(register))
         .route("/v1/encrypt", post(encrypt))
         .route("/v1/decrypt", post(decrypt))
         .route("/v1/quote", get(quote))
-        .route("/v1/private-key", post(reencrypt))
-        .route("/v1/decrypt-status", get(get_decrypt_request_status))
-        .route("/v1/register-status", get(get_register_app_request_status))
-        .route("/v1/private-key-status", get(get_reencrypt_request_status))
         .layer(TraceLayer::new_for_http())
         .with_state(app_state);
 

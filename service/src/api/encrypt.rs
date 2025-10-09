@@ -1,19 +1,15 @@
-use crate::AppState;
 use crate::error::AppError;
 use crate::types::{EncryptRequest, EncryptResponse};
+use crate::utils::get_key;
+
 use alloy::hex;
 use alloy::signers::Signer;
 use alloy_primitives::utils::keccak256;
-use axum::{Json, extract::State, response::IntoResponse};
-use dstack_sdk::dstack_client::GetKeyResponse;
-use dstack_sdk::ethereum::to_account;
-use dstack_sdk::tappd_client::TappdClient;
+use axum::{Json, response::IntoResponse};
+
 use uuid::Uuid;
 
-pub async fn encrypt(
-    State(state): State<AppState>,
-    Json(request): Json<EncryptRequest>,
-) -> Result<impl IntoResponse, AppError> {
+pub async fn encrypt(Json(request): Json<EncryptRequest>) -> Result<impl IntoResponse, AppError> {
     // Input validation
     if request.plaintext.is_empty() {
         tracing::warn!(
@@ -36,41 +32,21 @@ pub async fn encrypt(
     );
     let _guard = request_span.enter();
 
-    // activate below code when run within TEE
-    let client = TappdClient::new(None);
-    let key = client
-        .derive_key(request.turbo_da_app_id.to_string().as_str())
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to retrieve key");
-            AppError::KeyGenerationError(format!("Failed to retrieve key: {}", e))
-        })?;
-
-    // Ensure key length is even (required for hex::decode)
-    let adjusted_key = key.decode_key().map_err(|e| {
-        tracing::error!(error = %e, "Failed to decode key");
-        AppError::KeyGenerationError(format!("Failed to decode key: {}", e))
-    })?;
-
-    let key_response = GetKeyResponse {
-        key: hex::encode(adjusted_key),
-        signature_chain: key.certificate_chain,
-    };
-
-    let account = to_account(&key_response).map_err(|e| {
-        tracing::error!(error = %e, "Failed to convert key to account");
-        AppError::KeyGenerationError(format!("Failed to convert key to account: {}", e))
-    })?;
-
     tracing::debug!("Retrieving public key for encryption");
-    let public_key = state
-        .data_store
-        .get_public_key(request.turbo_da_app_id)
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to retrieve public key");
-            AppError::KeyNotFound(request.turbo_da_app_id)
-        })?;
+    let account = get_key(request.turbo_da_app_id).await?;
+
+    let public_key = account
+        .credential()
+        .verifying_key()
+        .to_encoded_point(false)
+        .as_bytes()
+        .to_vec();
+
+    tracing::debug!("Public key: {}", hex::encode(public_key.clone()));
+    tracing::debug!(
+        "Certificate: {}",
+        hex::encode(account.credential().to_bytes().to_vec().clone())
+    );
 
     tracing::debug!("Encrypting plaintext");
     let ecies_result = ecies::encrypt(&public_key, &request.plaintext).map_err(|e| {
@@ -81,7 +57,6 @@ pub async fn encrypt(
     let key_size = ecies::config::get_ephemeral_key_size();
     let (ephemeral_pub_key, ciphertext) = ecies_result.split_at(key_size);
 
-    // activate below code when run within TEE
     let message_hash = keccak256(ciphertext);
     let signature_ciphertext = account.sign_hash(&message_hash).await.map_err(|e| {
         tracing::error!(error = %e, "Failed to sign message hash");

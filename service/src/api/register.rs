@@ -6,8 +6,10 @@ use crate::types::{
     GetRegisterAppRequestStatusRequest, GetRegisterAppRequestStatusResponse, RegisterAppRequest,
     RegisterResponse,
 };
+use crate::utils::get_key;
 use axum::extract::Query;
 use axum::{Json, extract::State, response::IntoResponse};
+use dstack_sdk::dstack_client::DstackClient;
 use uuid::Uuid;
 
 pub async fn register(
@@ -70,14 +72,7 @@ pub async fn register(
             AppError::Database(e.to_string())
         })?;
 
-    state
-        .worker_manager
-        .send_job(JobType::RegisterApp(request.turbo_da_app_id, job_id))
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to send register app request to worker");
-            AppError::Internal(e.to_string())
-        })?;
+    let account = get_key(request.turbo_da_app_id).await?;
 
     println!("no issues till here");
 
@@ -89,40 +84,5 @@ pub async fn register(
     Ok(Json(RegisterResponse {
         turbo_da_app_id: request.turbo_da_app_id,
         job_id: job_id,
-    }))
-}
-
-pub async fn get_register_app_request_status(
-    State(state): State<AppState>,
-    Query(request): Query<GetRegisterAppRequestStatusRequest>,
-) -> Result<impl IntoResponse, AppError> {
-    let request_span = tracing::info_span!(
-        "get_register_app_request_status",
-        job_id = request.job_id.to_string()
-    );
-    let _guard = request_span.enter();
-
-    let register_app_request = state
-        .data_store
-        .get_register_app_request(request.job_id)
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to get register app request status");
-            AppError::Database(e.to_string())
-        })?;
-
-    if register_app_request.is_none() {
-        tracing::error!(
-            job_id = request.job_id.to_string(),
-            "Register app request not found"
-        );
-        return Err(AppError::RequestNotFound(format!(
-            "Register app request not found for job id: {}",
-            request.job_id
-        )));
-    }
-
-    Ok(Json(GetRegisterAppRequestStatusResponse {
-        request: register_app_request.unwrap(),
     }))
 }
