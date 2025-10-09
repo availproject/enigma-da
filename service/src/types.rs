@@ -53,13 +53,10 @@ pub struct DecryptRequest {
     pub ciphertext: Vec<u8>,
     pub ephemeral_pub_key: Vec<u8>,
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DecryptResponse {
-    pub job_id: Uuid,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct GetDecryptRequestStatusRequest {
-    pub job_id: Uuid,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DecryptRequestData {
+    pub app_id: String,
+    pub ciphertext_array: Vec<u8>,
+    pub ephemeral_pub_key_array: Vec<u8>,
+    pub decrypted_array: Option<Vec<u8>>,
 }

@@ -1,7 +1,6 @@
 pub mod decrypt;
 pub mod encrypt;
 pub mod quote;
-pub mod reencrypt;
 
 use crate::AppState;
 use axum::Json;

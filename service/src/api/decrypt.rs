@@ -1,18 +1,9 @@
-use crate::error::AppError;
 use crate::types::DecryptRequest;
 use crate::utils::get_key;
+use crate::{error::AppError, types::DecryptRequestData};
 
 use alloy::hex;
 use axum::{Json, response::IntoResponse};
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DecryptRequestData {
-    pub app_id: String,
-    pub ciphertext_array: Vec<u8>,
-    pub ephemeral_pub_key_array: Vec<u8>,
-    pub decrypted_array: Option<Vec<u8>>,
-}
 
 pub async fn decrypt(Json(request): Json<DecryptRequest>) -> Result<impl IntoResponse, AppError> {
     let request_span = tracing::info_span!(
@@ -43,8 +34,11 @@ pub async fn decrypt(Json(request): Json<DecryptRequest>) -> Result<impl IntoRes
 
     let decryption_key = account.credential().to_bytes().to_vec();
 
-    tracing::debug!("Decryption key: {}", hex::encode(decryption_key.clone()));
-    let decrypted_data = ecies::decrypt(&decryption_key, &request.ciphertext).map_err(|e| {
+    tracing::info!("Decryption key: {}", hex::encode(decryption_key.clone()));
+    let mut full_ciphertext = request.ephemeral_pub_key.clone();
+    full_ciphertext.extend_from_slice(&request.ciphertext);
+
+    let decrypted_data = ecies::decrypt(&decryption_key, &full_ciphertext).map_err(|e| {
         tracing::error!(error = %e, "Failed to decrypt data");
         AppError::EncryptionError(e.to_string())
     })?;

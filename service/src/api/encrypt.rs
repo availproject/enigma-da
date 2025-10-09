@@ -34,6 +34,7 @@ pub async fn encrypt(Json(request): Json<EncryptRequest>) -> Result<impl IntoRes
 
     tracing::debug!("Retrieving public key for encryption");
     let account = get_key(request.turbo_da_app_id).await?;
+    let decryption_key = account.credential().to_bytes().to_vec();
 
     let public_key = account
         .credential()
@@ -42,8 +43,8 @@ pub async fn encrypt(Json(request): Json<EncryptRequest>) -> Result<impl IntoRes
         .as_bytes()
         .to_vec();
 
-    tracing::debug!("Public key: {}", hex::encode(public_key.clone()));
-    tracing::debug!(
+    tracing::info!("Public key: {}", hex::encode(public_key.clone()));
+    tracing::info!(
         "Certificate: {}",
         hex::encode(account.credential().to_bytes().to_vec().clone())
     );

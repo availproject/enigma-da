@@ -1,9 +1,6 @@
 mod decrypt;
 mod encrypt;
 
-mod reencrypt;
-mod register;
-
 use glob::glob;
 use std::fs;
 use tracing::debug;
