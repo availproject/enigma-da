@@ -1,2 +1,2 @@
 #!/bin/bash
-/app/service
+/app/enigma-da

@@ -35,7 +35,7 @@ ENV SERVER_PORT=${SERVER_PORT}
 ENV SERVER_HOST=${SERVER_HOST}
 
 # Copy the built binaries from builder
-COPY --from=builder /usr/src/app/target/release/service /app/service
+COPY --from=builder /usr/src/app/target/release/enigma-da /app/enigma-da
 # Copy and set permissions for startup script
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh
