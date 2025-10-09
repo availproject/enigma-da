@@ -1,11 +1,11 @@
-[workspace]
-members = [  
-    "service",
-]
-exclude = ["enigma-kms-node"]
-resolver = "2"
 
-[workspace.dependencies]
+[package]
+name = "enigma-da"
+version = "0.0.7"
+edition = "2024"
+
+
+[dependencies]
 tokio = { version = "1.36", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -14,28 +14,14 @@ tower = "0.4"
 tower-http = { version = "0.5", features = ["trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-dstack-sdk = { git = "https://github.com/Dstack-TEE/dstack.git", package = "dstack-sdk", branch = "master" }
+dstack-sdk = { git = "https://github.com/Dstack-TEE/dstack.git", package = "dstack-sdk" }
 tiny-keccak = "2.0.2"
 alloy = { version = "0.15", default-features = false }
 alloy-primitives = "1.1.2"
-sled = "0.34"
 rstest = "0.20.0"
 http-body-util = "0.1.0"
 tempfile = "3.8"
 async-trait = "0.1"
-libp2p = { version = "0.53", features = [
-    "tcp",
-    "noise",
-    "yamux",
-    "gossipsub",
-    "mdns",
-    "request-response",
-    "identify",
-    "kad",
-    "macros",
-    "tokio",
-    "ping",
-] }
 lazy_static = "1.4"
 anyhow = "1.0.98"
 bincode = "1.3.3"
@@ -48,8 +34,13 @@ sha2 = "0.10.8"
 futures = "0.3"
 prost = "0.11"
 tonic = "0.8"
-keygen = { path = "keygen", version = "0.1.0" }
-keys = { path = "keys", version = "0.1.0" }
-proto = { path = "proto", version = "0.1.0"}
 uuid = {version = "=1.8.0" , features = ["v4","fast-rng","macro-diagnostics", "serde"]}
- 
+axum = "0.8.4"
+dashmap = "5.5"
+ecies = "0.2"
+secp256k1 = "0.28"
+
+[dev-dependencies]
+rstest = "0.20.0"
+http-body-util = "0.1.0"
+glob = "0.3"

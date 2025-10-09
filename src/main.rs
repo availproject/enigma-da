@@ -2,17 +2,13 @@ use axum::{
     Router,
     routing::{get, post},
 };
-use std::sync::Arc;
+
 use tower_http::trace::TraceLayer;
 
 use crate::api::{decrypt, encrypt, health, quote};
-use crate::config::ServiceConfig;
+use crate::config::ServerConfig;
 use crate::tracer::{TracingConfig, init_tracer};
 
-#[derive(Clone)]
-pub struct AppState {
-    pub config: Arc<ServiceConfig>,
-}
 pub mod api;
 pub mod config;
 
@@ -30,14 +26,9 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Starting encryption server and services...");
 
     // Load configuration
-    let config = ServiceConfig::from_env();
+    let config = ServerConfig::from_env();
 
     tracing::info!("Data store initialized");
-
-    // Create application state with async trait objects
-    let app_state = AppState {
-        config: Arc::new(config.clone()),
-    };
 
     // Application routes
     let app = Router::new()
@@ -45,10 +36,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/encrypt", post(encrypt))
         .route("/v1/decrypt", post(decrypt))
         .route("/v1/quote", get(quote))
-        .layer(TraceLayer::new_for_http())
-        .with_state(app_state);
+        .layer(TraceLayer::new_for_http());
 
-    let addr = format!("{}:{}", config.server.host, config.server.port);
+    let addr = format!("{}:{}", config.host, config.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
 
     tracing::info!(address = %addr, "Encryption server listening");
