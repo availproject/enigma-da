@@ -1,10 +1,10 @@
-use crate::api::encrypt::encrypt;
-
-use crate::tests::cleanup_test_files;
-use crate::types::{EncryptRequest, EncryptResponse};
+use crate::{
+    api::encrypt::encrypt,
+    tests::cleanup_test_files,
+    types::{EncryptRequest, EncryptResponse},
+};
 use axum::{Json, response::IntoResponse};
 use http_body_util::BodyExt;
-
 use uuid::Uuid;
 
 #[tokio::test]

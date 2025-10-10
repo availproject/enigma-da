@@ -1,17 +1,16 @@
+use crate::{
+    api::{decrypt, encrypt, health, quote},
+    config::ServerConfig,
+    tracer::{TracingConfig, init_tracer},
+};
 use axum::{
     Router,
     routing::{get, post},
 };
-
 use tower_http::trace::TraceLayer;
-
-use crate::api::{decrypt, encrypt, health, quote};
-use crate::config::ServerConfig;
-use crate::tracer::{TracingConfig, init_tracer};
 
 pub mod api;
 pub mod config;
-
 pub mod error;
 pub mod tracer;
 pub mod types;

@@ -1,12 +1,10 @@
-use crate::error::AppError;
-use crate::types::{EncryptRequest, EncryptResponse};
-use crate::utils::get_key;
-
-use alloy::hex;
-use alloy::signers::Signer;
-use alloy_primitives::utils::keccak256;
+use crate::{
+    error::AppError,
+    types::{EncryptRequest, EncryptResponse},
+    utils::get_key,
+};
+use alloy::{primitives::utils::keccak256, signers::Signer};
 use axum::{Json, response::IntoResponse};
-
 use uuid::Uuid;
 
 pub async fn encrypt(Json(request): Json<EncryptRequest>) -> Result<impl IntoResponse, AppError> {
@@ -36,19 +34,12 @@ pub async fn encrypt(Json(request): Json<EncryptRequest>) -> Result<impl IntoRes
     let account = get_key(request.turbo_da_app_id).await?;
     let decryption_key = account.credential().to_bytes().to_vec();
 
-    tracing::info!("Decryption key: {}", hex::encode(decryption_key.clone()));
     let public_key = account
         .credential()
         .verifying_key()
         .to_encoded_point(false)
         .as_bytes()
         .to_vec();
-
-    tracing::info!("Public key: {}", hex::encode(public_key.clone()));
-    tracing::info!(
-        "Certificate: {}",
-        hex::encode(account.credential().to_bytes().to_vec().clone())
-    );
 
     tracing::debug!("Encrypting plaintext");
     let ecies_result = ecies::encrypt(&public_key, &request.plaintext).map_err(|e| {

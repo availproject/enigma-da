@@ -1,6 +1,4 @@
-use crate::error::AppError;
-
-use crate::types::QuoteResponse;
+use crate::{error::AppError, types::QuoteResponse};
 use axum::{Json, response::IntoResponse};
 use dstack_sdk::dstack_client::DstackClient;
 

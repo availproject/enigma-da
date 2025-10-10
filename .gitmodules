@@ -1,4 +1,0 @@
-[submodule "enigma-kms-node"]
-	path = enigma-kms-node
-	url = https://github.com/RizeLabs/enigma-kms-node
-	branch = deploy

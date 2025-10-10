@@ -1,8 +1,8 @@
-use crate::types::DecryptRequest;
-use crate::utils::get_key;
-use crate::{error::AppError, types::DecryptRequestData};
-
-use alloy::hex;
+use crate::{
+    error::AppError,
+    types::{DecryptRequest, DecryptRequestData},
+    utils::get_key,
+};
 use axum::{Json, response::IntoResponse};
 
 pub async fn decrypt(Json(request): Json<DecryptRequest>) -> Result<impl IntoResponse, AppError> {
@@ -34,7 +34,6 @@ pub async fn decrypt(Json(request): Json<DecryptRequest>) -> Result<impl IntoRes
 
     let decryption_key = account.credential().to_bytes().to_vec();
 
-    tracing::info!("Decryption key: {}", hex::encode(decryption_key.clone()));
     let mut full_ciphertext = request.ephemeral_pub_key.clone();
     full_ciphertext.extend_from_slice(&request.ciphertext);
 
