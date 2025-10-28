@@ -32,3 +32,12 @@ data/
 *.bin
 
 .DS_Store
+
+./scripts/certs/
+ca.crt
+server.crt
+server.key
+ca.key  
+client.crt
+client.key
+ca.srl

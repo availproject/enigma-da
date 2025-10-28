@@ -36,9 +36,12 @@ prost = "0.11"
 tonic = "0.8"
 uuid = {version = "=1.8.0" , features = ["v4","fast-rng","macro-diagnostics", "serde"]}
 axum = "0.8.4"
+axum-server = {version = "0.7.2", features = ["tls-rustls"]}
 dashmap = "5.5"
 ecies = "0.2"
 secp256k1 = "0.28"
+rustls = { version = "0.23.34", features = ["ring"] }
+rustls-pemfile = "2.2.0"
 
 [dev-dependencies]
 rstest = "0.20.0"

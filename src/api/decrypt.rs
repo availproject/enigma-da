@@ -8,7 +8,6 @@ use axum::{Json, response::IntoResponse};
 pub async fn decrypt(Json(request): Json<DecryptRequest>) -> Result<impl IntoResponse, AppError> {
     let request_span = tracing::info_span!(
         "decrypt_request",
-        app_id = request.turbo_da_app_id.to_string(),
         ciphertext_length = request.ciphertext.len(),
         turbo_da_app_id = request.turbo_da_app_id.to_string()
     );
