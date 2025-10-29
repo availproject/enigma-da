@@ -47,16 +47,24 @@ async fn main() -> anyhow::Result<()> {
     let ca_cert: Vec<CertificateDer> = if let Ok(cert_content) = env::var("CA_CERT") {
         // Replace literal \n with actual newlines (for cloud environments like Phala)
         let cert_with_newlines = cert_content.replace("\\n", "\n");
-        certs(&mut Cursor::new(cert_with_newlines.as_bytes())).collect::<Result<Vec<_>, _>>()?
+        certs(&mut Cursor::new(cert_with_newlines.as_bytes()))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| anyhow::anyhow!("Failed to read CA certificate: {}", e))?
     } else {
-        certs(&mut BufReader::new(File::open("ca.crt")?)).collect::<Result<Vec<_>, _>>()?
+        certs(&mut BufReader::new(File::open("ca.crt")?))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| anyhow::anyhow!("Failed to read CA certificate: {}", e))?
     };
 
     let server_cert: Vec<CertificateDer> = if let Ok(cert_content) = env::var("SERVER_CERT") {
         let cert_with_newlines = cert_content.replace("\\n", "\n");
-        certs(&mut Cursor::new(cert_with_newlines.as_bytes())).collect::<Result<Vec<_>, _>>()?
+        certs(&mut Cursor::new(cert_with_newlines.as_bytes()))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| anyhow::anyhow!("Failed to read server certificate: {}", e))?
     } else {
-        certs(&mut BufReader::new(File::open("server.crt")?)).collect::<Result<Vec<_>, _>>()?
+        certs(&mut BufReader::new(File::open("server.crt")?))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| anyhow::anyhow!("Failed to read server certificate: {}", e))?
     };
 
     let server_key = if let Ok(key_content) = env::var("SERVER_KEY") {
@@ -72,16 +80,22 @@ async fn main() -> anyhow::Result<()> {
 
     let mut root_store = RootCertStore::empty();
     for cert in ca_cert {
-        root_store.add(cert)?;
+        root_store
+            .add(cert)
+            .map_err(|e| anyhow::anyhow!("Failed to add CA certificate: {}", e))?;
     }
 
-    let client_auth = WebPkiClientVerifier::builder(root_store.into()).build()?;
+    let client_auth = WebPkiClientVerifier::builder(root_store.into())
+        .build()
+        .map_err(|e| anyhow::anyhow!("Failed to build client auth: {}", e))?;
 
     let rustls_server_config = RustlsServerConfig::builder()
         .with_client_cert_verifier(client_auth)
-        .with_single_cert(server_cert, server_key.into())?;
+        .with_single_cert(server_cert, server_key.into())
+        .map_err(|e| anyhow::anyhow!("Failed to build server config: {}", e))?;
 
-    let rustls_config = RustlsConfig::from_config(std::sync::Arc::new(rustls_server_config));
+    let rustls_config = RustlsConfig::from_config(std::sync::Arc::new(rustls_server_config))
+        .map_err(|e| anyhow::anyhow!("Failed to build Rustls config: {}", e))?;
 
     let app = Router::new()
         .route("/health", get(health))
