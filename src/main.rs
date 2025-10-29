@@ -45,19 +45,23 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Data store initialized");
 
     let ca_cert: Vec<CertificateDer> = if let Ok(cert_content) = env::var("CA_CERT") {
-        certs(&mut Cursor::new(cert_content.as_bytes())).collect::<Result<Vec<_>, _>>()?
+        // Replace literal \n with actual newlines (for cloud environments like Phala)
+        let cert_with_newlines = cert_content.replace("\\n", "\n");
+        certs(&mut Cursor::new(cert_with_newlines.as_bytes())).collect::<Result<Vec<_>, _>>()?
     } else {
         certs(&mut BufReader::new(File::open("ca.crt")?)).collect::<Result<Vec<_>, _>>()?
     };
 
     let server_cert: Vec<CertificateDer> = if let Ok(cert_content) = env::var("SERVER_CERT") {
-        certs(&mut Cursor::new(cert_content.as_bytes())).collect::<Result<Vec<_>, _>>()?
+        let cert_with_newlines = cert_content.replace("\\n", "\n");
+        certs(&mut Cursor::new(cert_with_newlines.as_bytes())).collect::<Result<Vec<_>, _>>()?
     } else {
         certs(&mut BufReader::new(File::open("server.crt")?)).collect::<Result<Vec<_>, _>>()?
     };
 
     let server_key = if let Ok(key_content) = env::var("SERVER_KEY") {
-        pkcs8_private_keys(&mut Cursor::new(key_content.as_bytes()))
+        let key_with_newlines = key_content.replace("\\n", "\n");
+        pkcs8_private_keys(&mut Cursor::new(key_with_newlines.as_bytes()))
             .next()
             .ok_or_else(|| anyhow::anyhow!("No private key found"))??
     } else {
