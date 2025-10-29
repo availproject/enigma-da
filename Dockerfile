@@ -1,5 +1,5 @@
 
-FROM debian:bookworm-slim as builder
+FROM rustlang/rust:nightly-bookworm as builder
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -9,9 +9,6 @@ RUN apt-get update && apt-get install -y \
   pkg-config \
   librocksdb-dev \
   && rm -rf /var/lib/apt/lists/*
-
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly
-ENV PATH="/root/.cargo/bin:${PATH}"
 
 WORKDIR /usr/src/app
 COPY . .
