@@ -5,13 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    #  platforms:
-    # - linux/amd64
-    # - linux/arm64
     ports:
       - "3000:3000"
-      - "3001:3001"
-      # - "${SERVER_PORT}:${SERVER_PORT}"
     environment:
       RUST_LOG: info
       RUST_BACKTRACE: 1
