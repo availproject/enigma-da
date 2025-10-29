@@ -15,7 +15,10 @@ use rustls::{
     server::WebPkiClientVerifier,
 };
 use rustls_pemfile::{certs, pkcs8_private_keys};
-use std::io::BufReader;
+use std::{
+    env,
+    io::{BufReader, Cursor},
+};
 use tower_http::trace::TraceLayer;
 
 pub mod api;
@@ -41,15 +44,27 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Data store initialized");
 
-    let ca_cert: Vec<CertificateDer> =
-        certs(&mut BufReader::new(File::open("ca.crt")?)).collect::<Result<Vec<_>, _>>()?;
+    let ca_cert: Vec<CertificateDer> = if let Ok(cert_content) = env::var("CA_CERT") {
+        certs(&mut Cursor::new(cert_content.as_bytes())).collect::<Result<Vec<_>, _>>()?
+    } else {
+        certs(&mut BufReader::new(File::open("ca.crt")?)).collect::<Result<Vec<_>, _>>()?
+    };
 
-    let server_cert: Vec<CertificateDer> =
-        certs(&mut BufReader::new(File::open("server.crt")?)).collect::<Result<Vec<_>, _>>()?;
+    let server_cert: Vec<CertificateDer> = if let Ok(cert_content) = env::var("SERVER_CERT") {
+        certs(&mut Cursor::new(cert_content.as_bytes())).collect::<Result<Vec<_>, _>>()?
+    } else {
+        certs(&mut BufReader::new(File::open("server.crt")?)).collect::<Result<Vec<_>, _>>()?
+    };
 
-    let server_key = pkcs8_private_keys(&mut BufReader::new(File::open("server.key")?))
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("No private key found"))??;
+    let server_key = if let Ok(key_content) = env::var("SERVER_KEY") {
+        pkcs8_private_keys(&mut Cursor::new(key_content.as_bytes()))
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("No private key found"))??
+    } else {
+        pkcs8_private_keys(&mut BufReader::new(File::open("server.key")?))
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("No private key found"))??
+    };
 
     let mut root_store = RootCertStore::empty();
     for cert in ca_cert {
