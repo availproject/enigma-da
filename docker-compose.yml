@@ -17,6 +17,9 @@ services:
       RUST_BACKTRACE: 1
       SERVER_PORT: ${SERVER_PORT}
       SERVER_HOST: ${SERVER_HOST}
+      CA_CERT: ${CA_CERT}
+      SERVER_CERT: ${SERVER_CERT}
+      SERVER_KEY: ${SERVER_KEY}
     volumes:
       - /var/run/dstack.sock:/var/run/dstack.sock
     command: ["/app/start.sh"]

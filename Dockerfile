@@ -29,11 +29,15 @@ WORKDIR /app
 
 ARG SERVER_PORT
 ARG SERVER_HOST
-
+ARG CA_CERT
+ARG SERVER_CERT
+ARG SERVER_KEY
 
 ENV SERVER_PORT=${SERVER_PORT}
 ENV SERVER_HOST=${SERVER_HOST}
-
+ENV CA_CERT=${CA_CERT}
+ENV SERVER_CERT=${SERVER_CERT}
+ENV SERVER_KEY=${SERVER_KEY}
 # Copy the built binaries from builder
 COPY --from=builder /usr/src/app/target/release/enigma-da /app/enigma-da
 # Copy and set permissions for startup script
