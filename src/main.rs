@@ -94,8 +94,7 @@ async fn main() -> anyhow::Result<()> {
         .with_single_cert(server_cert, server_key.into())
         .map_err(|e| anyhow::anyhow!("Failed to build server config: {}", e))?;
 
-    let rustls_config = RustlsConfig::from_config(std::sync::Arc::new(rustls_server_config))
-        .map_err(|e| anyhow::anyhow!("Failed to build Rustls config: {}", e))?;
+    let rustls_config = RustlsConfig::from_config(std::sync::Arc::new(rustls_server_config));
 
     let app = Router::new()
         .route("/health", get(health))
