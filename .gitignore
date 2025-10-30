@@ -41,3 +41,4 @@ ca.key
 client.crt
 client.key
 ca.srl
+./scripts/certs_prod
