@@ -88,10 +88,7 @@ async fn main() -> anyhow::Result<()> {
             .ok_or_else(|| anyhow::anyhow!("No private key found"))??
     };
 
-    tracing::info!(
-        "Server key read successfully with length: {}",
-        server_key.len()
-    );
+    tracing::info!("Server key read successfully");
 
     let mut root_store = RootCertStore::empty();
     tracing::info!("Adding CA certificates to root store");
