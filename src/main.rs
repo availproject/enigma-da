@@ -56,6 +56,11 @@ async fn main() -> anyhow::Result<()> {
             .map_err(|e| anyhow::anyhow!("Failed to read CA certificate: {}", e))?
     };
 
+    tracing::info!(
+        "CA certificate read successfully with length: {}",
+        ca_cert.len()
+    );
+
     let server_cert: Vec<CertificateDer> = if let Ok(cert_content) = env::var("SERVER_CERT") {
         let cert_with_newlines = cert_content.replace("\\n", "\n");
         certs(&mut Cursor::new(cert_with_newlines.as_bytes()))
@@ -66,6 +71,11 @@ async fn main() -> anyhow::Result<()> {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| anyhow::anyhow!("Failed to read server certificate: {}", e))?
     };
+
+    tracing::info!(
+        "Server certificate read successfully with length: {}",
+        server_cert.len()
+    );
 
     let server_key = if let Ok(key_content) = env::var("SERVER_KEY") {
         let key_with_newlines = key_content.replace("\\n", "\n");
@@ -78,24 +88,38 @@ async fn main() -> anyhow::Result<()> {
             .ok_or_else(|| anyhow::anyhow!("No private key found"))??
     };
 
+    tracing::info!(
+        "Server key read successfully with length: {}",
+        server_key.len()
+    );
+
     let mut root_store = RootCertStore::empty();
+    tracing::info!("Adding CA certificates to root store");
     for cert in ca_cert {
         root_store
             .add(cert)
             .map_err(|e| anyhow::anyhow!("Failed to add CA certificate: {}", e))?;
     }
 
+    tracing::info!(
+        "Root store built successfully with length: {}",
+        root_store.len()
+    );
+
     let client_auth = WebPkiClientVerifier::builder(root_store.into())
         .build()
         .map_err(|e| anyhow::anyhow!("Failed to build client auth: {}", e))?;
 
+    tracing::info!("Building server config");
     let rustls_server_config = RustlsServerConfig::builder()
         .with_client_cert_verifier(client_auth)
         .with_single_cert(server_cert, server_key.into())
         .map_err(|e| anyhow::anyhow!("Failed to build server config: {}", e))?;
 
+    tracing::info!("Building Rustls config");
     let rustls_config = RustlsConfig::from_config(std::sync::Arc::new(rustls_server_config));
 
+    tracing::info!("Building router");
     let app = Router::new()
         .route("/health", get(health))
         .route("/v1/encrypt", post(encrypt))
