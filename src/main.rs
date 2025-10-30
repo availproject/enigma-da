@@ -45,9 +45,11 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Data store initialized");
 
     let ca_cert: Vec<CertificateDer> = if let Ok(cert_content) = env::var("CA_CERT") {
-        // Replace literal \n with actual newlines (for cloud environments like Phala)
-        let cert_with_newlines = cert_content.replace("\\n", "\n");
-        certs(&mut Cursor::new(cert_with_newlines.as_bytes()))
+        tracing::info!(
+            "Reading CA certificate from environment variable {}",
+            cert_content
+        );
+        certs(&mut Cursor::new(cert_content.as_bytes()))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| anyhow::anyhow!("Failed to read CA certificate: {}", e))?
     } else {
@@ -62,8 +64,11 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let server_cert: Vec<CertificateDer> = if let Ok(cert_content) = env::var("SERVER_CERT") {
-        let cert_with_newlines = cert_content.replace("\\n", "\n");
-        certs(&mut Cursor::new(cert_with_newlines.as_bytes()))
+        tracing::info!(
+            "Reading server certificate from environment variable {}",
+            cert_content
+        );
+        certs(&mut Cursor::new(cert_content.as_bytes()))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| anyhow::anyhow!("Failed to read server certificate: {}", e))?
     } else {
@@ -78,8 +83,11 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let server_key = if let Ok(key_content) = env::var("SERVER_KEY") {
-        let key_with_newlines = key_content.replace("\\n", "\n");
-        pkcs8_private_keys(&mut Cursor::new(key_with_newlines.as_bytes()))
+        tracing::info!(
+            "Reading server key from environment variable {}",
+            key_content
+        );
+        pkcs8_private_keys(&mut Cursor::new(key_content.as_bytes()))
             .next()
             .ok_or_else(|| anyhow::anyhow!("No private key found"))??
     } else {
