@@ -45,11 +45,10 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Data store initialized");
 
     let ca_cert: Vec<CertificateDer> = if let Ok(cert_content) = env::var("CA_CERT") {
-        tracing::info!(
-            "Reading CA certificate from environment variable {}",
-            cert_content
-        );
-        certs(&mut Cursor::new(cert_content.as_bytes()))
+        tracing::info!("Reading CA certificate from environment variable");
+        let cert_normalized = normalize_cert(cert_content);
+
+        certs(&mut Cursor::new(cert_normalized.as_bytes()))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| anyhow::anyhow!("Failed to read CA certificate: {}", e))?
     } else {
@@ -58,17 +57,12 @@ async fn main() -> anyhow::Result<()> {
             .map_err(|e| anyhow::anyhow!("Failed to read CA certificate: {}", e))?
     };
 
-    tracing::info!(
-        "CA certificate read successfully with length: {}",
-        ca_cert.len()
-    );
+    tracing::info!("CA certificate read successfully");
 
     let server_cert: Vec<CertificateDer> = if let Ok(cert_content) = env::var("SERVER_CERT") {
-        tracing::info!(
-            "Reading server certificate from environment variable {}",
-            cert_content
-        );
-        certs(&mut Cursor::new(cert_content.as_bytes()))
+        tracing::info!("Reading server certificate from environment variable");
+        let cert_normalized = normalize_cert(cert_content);
+        certs(&mut Cursor::new(cert_normalized.as_bytes()))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| anyhow::anyhow!("Failed to read server certificate: {}", e))?
     } else {
@@ -83,11 +77,10 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let server_key = if let Ok(key_content) = env::var("SERVER_KEY") {
-        tracing::info!(
-            "Reading server key from environment variable {}",
-            key_content
-        );
-        pkcs8_private_keys(&mut Cursor::new(key_content.as_bytes()))
+        tracing::info!("Reading server key from environment variable");
+        let key_normalized = normalize_cert(key_content);
+
+        pkcs8_private_keys(&mut Cursor::new(key_normalized.as_bytes()))
             .next()
             .ok_or_else(|| anyhow::anyhow!("No private key found"))??
     } else {
@@ -155,4 +148,110 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Server shutdown complete");
     Ok(())
+}
+fn normalize_cert(content: String) -> String {
+    if !content.contains('\n') {
+        let headers = [
+            (
+                "-----BEGIN CERTIFICATE----- ",
+                "-----BEGIN CERTIFICATE-----\n",
+            ),
+            (
+                "-----BEGIN PRIVATE KEY----- ",
+                "-----BEGIN PRIVATE KEY-----\n",
+            ),
+            (
+                "-----BEGIN RSA PRIVATE KEY----- ",
+                "-----BEGIN RSA PRIVATE KEY-----\n",
+            ),
+            (
+                "-----BEGIN EC PRIVATE KEY----- ",
+                "-----BEGIN EC PRIVATE KEY-----\n",
+            ),
+            (
+                "-----BEGIN ENCRYPTED PRIVATE KEY----- ",
+                "-----BEGIN ENCRYPTED PRIVATE KEY-----\n",
+            ),
+        ];
+
+        let footers = [
+            (
+                " -----END CERTIFICATE-----",
+                "\n-----END CERTIFICATE-----\n",
+            ),
+            (
+                " -----END PRIVATE KEY-----",
+                "\n-----END PRIVATE KEY-----\n",
+            ),
+            (
+                " -----END RSA PRIVATE KEY-----",
+                "\n-----END RSA PRIVATE KEY-----\n",
+            ),
+            (
+                " -----END EC PRIVATE KEY-----",
+                "\n-----END EC PRIVATE KEY-----\n",
+            ),
+            (
+                " -----END ENCRYPTED PRIVATE KEY-----",
+                "\n-----END ENCRYPTED PRIVATE KEY-----\n",
+            ),
+        ];
+
+        let fixes = [
+            (
+                "-----BEGIN\nCERTIFICATE-----",
+                "-----BEGIN CERTIFICATE-----",
+            ),
+            ("-----END\nCERTIFICATE-----", "-----END CERTIFICATE-----"),
+            (
+                "-----BEGIN\nPRIVATE\nKEY-----",
+                "-----BEGIN PRIVATE KEY-----",
+            ),
+            ("-----END\nPRIVATE\nKEY-----", "-----END PRIVATE KEY-----"),
+            (
+                "-----BEGIN\nRSA\nPRIVATE\nKEY-----",
+                "-----BEGIN RSA PRIVATE KEY-----",
+            ),
+            (
+                "-----END\nRSA\nPRIVATE\nKEY-----",
+                "-----END RSA PRIVATE KEY-----",
+            ),
+            (
+                "-----BEGIN\nEC\nPRIVATE\nKEY-----",
+                "-----BEGIN EC PRIVATE KEY-----",
+            ),
+            (
+                "-----END\nEC\nPRIVATE\nKEY-----",
+                "-----END EC PRIVATE KEY-----",
+            ),
+            (
+                "-----BEGIN\nENCRYPTED\nPRIVATE\nKEY-----",
+                "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+            ),
+            (
+                "-----END\nENCRYPTED\nPRIVATE\nKEY-----",
+                "-----END ENCRYPTED PRIVATE KEY-----",
+            ),
+        ];
+
+        let mut normalized = content.clone();
+
+        for (search, replace) in &headers {
+            normalized = normalized.replace(search, replace);
+        }
+
+        for (search, replace) in &footers {
+            normalized = normalized.replace(search, replace);
+        }
+
+        normalized = normalized.split_whitespace().collect::<Vec<_>>().join("\n");
+
+        for (search, replace) in &fixes {
+            normalized = normalized.replace(search, replace);
+        }
+
+        normalized
+    } else {
+        content
+    }
 }
