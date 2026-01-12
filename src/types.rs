@@ -60,7 +60,7 @@ pub struct SubmitSignatureResponse {
     pub signatures_submitted: usize,
     pub threshold: i64,
     pub ready_to_decrypt: bool,
-    pub tee_attestion: Option<GetQuoteResponse>
+    pub tee_attestion: Option<GetQuoteResponse>,
 }
 
 #[derive(Debug, Serialize)]

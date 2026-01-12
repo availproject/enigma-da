@@ -2,16 +2,16 @@ mod decrypt;
 mod encrypt;
 
 use glob::glob;
+use sqlx::SqlitePool;
 use std::fs;
 use tracing::debug;
-use sqlx::SqlitePool;
 
 /// Helper function to create a test database with all required tables
 pub async fn setup_test_db() -> SqlitePool {
     let pool = SqlitePool::connect("sqlite::memory:")
         .await
         .expect("Failed to create test database");
-    
+
     // Create apps table
     sqlx::query(
         r#"

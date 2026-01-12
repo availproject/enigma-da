@@ -9,7 +9,6 @@ use crate::{error::AppError, types::QuoteResponse};
 use k256::ecdsa::SigningKey;
 use uuid::Uuid;
 
-
 pub(crate) async fn get_key(turbo_da_app_id: Uuid) -> Result<LocalSigner<SigningKey>, AppError> {
     let client = DstackClient::new(None);
     let key = client
@@ -39,17 +38,14 @@ pub(crate) async fn get_key(turbo_da_app_id: Uuid) -> Result<LocalSigner<Signing
     Ok(account)
 }
 
-pub(crate) async fn encrypt(
-    turbo_da_app_id: Uuid,
-    plaintext: &[u8],
-) -> Result<Vec<u8>, AppError> {
+pub(crate) async fn encrypt(turbo_da_app_id: Uuid, plaintext: &[u8]) -> Result<Vec<u8>, AppError> {
     tracing::info!(
         app_id = %turbo_da_app_id,
         "Starting MPC encryption process"
     );
 
     let account = get_key(turbo_da_app_id).await?;
-    
+
     let public_key = account
         .credential()
         .verifying_key()
@@ -57,11 +53,10 @@ pub(crate) async fn encrypt(
         .as_bytes()
         .to_vec();
 
-    let ciphertext = ecies::encrypt(&public_key, plaintext)
-        .map_err(|e| {
-            tracing::error!(error = %e, "ECIES encryption failed");
-            AppError::EncryptionError(format!("ECIES encryption failed: {}", e))
-        })?;
+    let ciphertext = ecies::encrypt(&public_key, plaintext).map_err(|e| {
+        tracing::error!(error = %e, "ECIES encryption failed");
+        AppError::EncryptionError(format!("ECIES encryption failed: {}", e))
+    })?;
 
     tracing::info!(
         app_id = %turbo_da_app_id,
@@ -72,26 +67,20 @@ pub(crate) async fn encrypt(
     Ok(ciphertext)
 }
 
-pub(crate) async fn decrypt(
-    turbo_da_app_id: Uuid,
-    ciphertext: &[u8],
-) -> Result<Vec<u8>, AppError> {
+pub(crate) async fn decrypt(turbo_da_app_id: Uuid, ciphertext: &[u8]) -> Result<Vec<u8>, AppError> {
     tracing::info!(
         app_id = %turbo_da_app_id,
         "Starting MPC decryption process"
     );
 
     let account = get_key(turbo_da_app_id).await?;
-    
-    let private_key_bytes = account
-        .credential()
-        .to_bytes();
 
-    let plaintext = ecies::decrypt(&private_key_bytes, ciphertext)
-        .map_err(|e| {
-            tracing::error!(error = %e, "ECIES decryption failed");
-            AppError::DecryptionError(format!("ECIES decryption failed: {}", e))
-        })?;
+    let private_key_bytes = account.credential().to_bytes();
+
+    let plaintext = ecies::decrypt(&private_key_bytes, ciphertext).map_err(|e| {
+        tracing::error!(error = %e, "ECIES decryption failed");
+        AppError::DecryptionError(format!("ECIES decryption failed: {}", e))
+    })?;
 
     tracing::info!(
         app_id = %turbo_da_app_id,
@@ -102,7 +91,7 @@ pub(crate) async fn decrypt(
     Ok(plaintext)
 }
 
-pub async fn quote(data: Vec<u8>) -> Result<QuoteResponse,AppError> {
+pub async fn quote(data: Vec<u8>) -> Result<QuoteResponse, AppError> {
     let client = DstackClient::new(None);
 
     let quote_resp = client.get_quote(data).await.map_err(|e| {
@@ -124,29 +113,23 @@ pub(crate) fn verify_ecdsa_signature(
     expected_address: &str,
 ) -> Result<bool, AppError> {
     println!("signatre hex {signature_hex}");
-    let signature = signature_hex
-        .parse::<Signature>()
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to parse signature");
-            AppError::InvalidInput(format!("Invalid signature format: {}", e))
-        })?;
-    
-    let expected_addr = expected_address
-        .parse::<Address>()
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to parse address");
-            AppError::InvalidInput(format!("Invalid address format: {}", e))
-        })?;
-    
-    let recovered_addr = signature
-        .recover_address_from_msg(message)
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to recover address from signature");
-            AppError::InvalidInput(format!("Signature recovery failed: {}", e))
-        })?;
-    
+    let signature = signature_hex.parse::<Signature>().map_err(|e| {
+        tracing::error!(error = %e, "Failed to parse signature");
+        AppError::InvalidInput(format!("Invalid signature format: {}", e))
+    })?;
+
+    let expected_addr = expected_address.parse::<Address>().map_err(|e| {
+        tracing::error!(error = %e, "Failed to parse address");
+        AppError::InvalidInput(format!("Invalid address format: {}", e))
+    })?;
+
+    let recovered_addr = signature.recover_address_from_msg(message).map_err(|e| {
+        tracing::error!(error = %e, "Failed to recover address from signature");
+        AppError::InvalidInput(format!("Signature recovery failed: {}", e))
+    })?;
+
     let is_valid = recovered_addr == expected_addr;
-    
+
     if is_valid {
         tracing::debug!(
             expected = %expected_addr,
@@ -160,6 +143,6 @@ pub(crate) fn verify_ecdsa_signature(
             "ECDSA signature verification failed - address mismatch"
         );
     }
-    
+
     Ok(is_valid)
 }

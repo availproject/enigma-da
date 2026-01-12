@@ -6,7 +6,7 @@ use crate::{
         DeleteParticipantResponse, RegisterRequest, RegisterResponse,
     },
 };
-use axum::{Json, extract::State, response::IntoResponse};
+use axum::{extract::State, response::IntoResponse, Json};
 use sqlx::SqlitePool;
 
 pub async fn register(

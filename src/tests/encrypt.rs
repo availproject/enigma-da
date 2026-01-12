@@ -4,7 +4,7 @@ use crate::{
     tests::{cleanup_test_files, setup_test_db},
     types::{EncryptRequest, EncryptResponse},
 };
-use axum::{Json, extract::State, response::IntoResponse};
+use axum::{extract::State, response::IntoResponse, Json};
 use http_body_util::BodyExt;
 use uuid::Uuid;
 
@@ -27,12 +27,20 @@ async fn test_encrypt_request_endpoint() {
         .expect("Failed to register app");
 
     // Add participants
-    db::add_participant(&pool, &turbo_da_app_id.to_string(), "0x1234567890123456789012345678901234567890")
-        .await
-        .expect("Failed to add participant 1");
-    db::add_participant(&pool, &turbo_da_app_id.to_string(), "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
-        .await
-        .expect("Failed to add participant 2");
+    db::add_participant(
+        &pool,
+        &turbo_da_app_id.to_string(),
+        "0x1234567890123456789012345678901234567890",
+    )
+    .await
+    .expect("Failed to add participant 1");
+    db::add_participant(
+        &pool,
+        &turbo_da_app_id.to_string(),
+        "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+    )
+    .await
+    .expect("Failed to add participant 2");
 
     // Wait a bit for registration to complete
     tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;

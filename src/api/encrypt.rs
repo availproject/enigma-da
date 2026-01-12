@@ -5,7 +5,7 @@ use crate::{
     utils,
 };
 use alloy::{primitives::utils::keccak256, signers::Signer};
-use axum::{Json, extract::State, response::IntoResponse};
+use axum::{extract::State, response::IntoResponse, Json};
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
@@ -84,7 +84,6 @@ pub async fn encrypt(
         ciphertext_length = ciphertext.len(),
         "Successfully encrypted data"
     );
-
 
     Ok(Json(EncryptResponse {
         ciphertext: ciphertext.to_vec(),

@@ -163,12 +163,11 @@ pub async fn get_app_threshold(
     pool: &SqlitePool,
     turbo_da_app_id: &str,
 ) -> Result<Option<i64>, sqlx::Error> {
-    let threshold = sqlx::query_scalar::<_, i64>(
-        "SELECT threshold FROM apps WHERE turbo_da_app_id = ?",
-    )
-    .bind(turbo_da_app_id)
-    .fetch_optional(pool)
-    .await?;
+    let threshold =
+        sqlx::query_scalar::<_, i64>("SELECT threshold FROM apps WHERE turbo_da_app_id = ?")
+            .bind(turbo_da_app_id)
+            .fetch_optional(pool)
+            .await?;
 
     Ok(threshold)
 }
@@ -232,12 +231,11 @@ pub async fn has_participants(
     pool: &SqlitePool,
     turbo_da_app_id: &str,
 ) -> Result<bool, sqlx::Error> {
-    let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM mpc_participants WHERE turbo_da_app_id = ?",
-    )
-    .bind(turbo_da_app_id)
-    .fetch_one(pool)
-    .await?;
+    let count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM mpc_participants WHERE turbo_da_app_id = ?")
+            .bind(turbo_da_app_id)
+            .fetch_one(pool)
+            .await?;
 
     Ok(count > 0)
 }
@@ -290,14 +288,18 @@ pub async fn submit_signature(
     signature: &str,
 ) -> Result<bool, sqlx::Error> {
     // Get current submitted signatures
-    let record = get_decryption_request(pool, id).await?
+    let record = get_decryption_request(pool, id)
+        .await?
         .ok_or_else(|| sqlx::Error::RowNotFound)?;
 
     let mut signatures: Vec<serde_json::Value> = serde_json::from_str(&record.submitted_signatures)
         .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
 
     // Check if participant already submitted
-    if signatures.iter().any(|s| s["participant"] == participant_address) {
+    if signatures
+        .iter()
+        .any(|s| s["participant"] == participant_address)
+    {
         return Ok(false); // Already submitted
     }
 
@@ -308,16 +310,15 @@ pub async fn submit_signature(
         "submitted_at": chrono::Utc::now().timestamp()
     }));
 
-    let signatures_json = serde_json::to_string(&signatures)
-        .map_err(|e| sqlx::Error::Encode(Box::new(e)))?;
+    let signatures_json =
+        serde_json::to_string(&signatures).map_err(|e| sqlx::Error::Encode(Box::new(e)))?;
 
-    let result = sqlx::query(
-        "UPDATE decryption_requests SET submitted_signatures = ? WHERE id = ?",
-    )
-    .bind(signatures_json)
-    .bind(id)
-    .execute(pool)
-    .await?;
+    let result =
+        sqlx::query("UPDATE decryption_requests SET submitted_signatures = ? WHERE id = ?")
+            .bind(signatures_json)
+            .bind(id)
+            .execute(pool)
+            .await?;
 
     Ok(result.rows_affected() > 0)
 }

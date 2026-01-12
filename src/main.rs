@@ -2,22 +2,24 @@
 use std::fs::File;
 
 use crate::{
-    api::{add_participant, create_decrypt_request, delete_participant, encrypt, get_decrypt_request, health,  register, submit_signature},
+    api::{
+        add_participant, create_decrypt_request, delete_participant, encrypt, get_decrypt_request,
+        health, register, submit_signature,
+    },
     config::ServerConfig,
-    tracer::{TracingConfig, init_tracer},
+    tracer::{init_tracer, TracingConfig},
 };
 use axum::{
-    Router,
     routing::{delete, get, post},
+    Router,
 };
-
 
 #[cfg(not(debug_assertions))]
 use axum_server::tls_rustls::RustlsConfig;
 #[cfg(not(debug_assertions))]
 use rustls::{
-    RootCertStore, ServerConfig as RustlsServerConfig, pki_types::CertificateDer,
-    server::WebPkiClientVerifier,
+    pki_types::CertificateDer, server::WebPkiClientVerifier, RootCertStore,
+    ServerConfig as RustlsServerConfig,
 };
 
 #[cfg(not(debug_assertions))]

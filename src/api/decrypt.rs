@@ -241,7 +241,6 @@ pub async fn submit_signature(
         "Signature submitted successfully"
     );
 
-
     if ready_to_decrypt {
         tracing::info!(
             request_id = %request_id,
