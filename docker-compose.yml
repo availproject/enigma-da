@@ -17,4 +17,5 @@ services:
       SERVER_KEY: ${SERVER_KEY}
     volumes:
       - /var/run/dstack.sock:/var/run/dstack.sock
+      - ./data:/app/data
     command: ["/app/start.sh"]

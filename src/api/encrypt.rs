@@ -1,14 +1,18 @@
 use crate::{
+    db,
     error::AppError,
     types::{EncryptRequest, EncryptResponse},
-    utils::get_key,
+    utils,
 };
 use alloy::{primitives::utils::keccak256, signers::Signer};
-use axum::{Json, response::IntoResponse};
+use axum::{Json, extract::State, response::IntoResponse};
+use sqlx::SqlitePool;
 use uuid::Uuid;
 
-pub async fn encrypt(Json(request): Json<EncryptRequest>) -> Result<impl IntoResponse, AppError> {
-    // Input validation
+pub async fn encrypt(
+    State(pool): State<SqlitePool>,
+    Json(request): Json<EncryptRequest>,
+) -> Result<impl IntoResponse, AppError> {
     if request.plaintext.is_empty() {
         tracing::warn!(
             app_id = request.turbo_da_app_id.to_string(),
@@ -22,6 +26,23 @@ pub async fn encrypt(Json(request): Json<EncryptRequest>) -> Result<impl IntoRes
         return Err(AppError::InvalidInput("app_id cannot be 0".into()));
     }
 
+    let has_participants = db::has_participants(&pool, &request.turbo_da_app_id.to_string())
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to check participants");
+            AppError::Database(format!("Failed to check participants: {}", e))
+        })?;
+
+    if !has_participants {
+        tracing::warn!(
+            app_id = request.turbo_da_app_id.to_string(),
+            "No registered participants for app_id"
+        );
+        return Err(AppError::InvalidInput(
+            "No registered participants found. Please register participants first.".into(),
+        ));
+    }
+
     let request_span = tracing::info_span!(
         "encrypt_request",
         app_id = request.turbo_da_app_id.to_string(),
@@ -30,24 +51,16 @@ pub async fn encrypt(Json(request): Json<EncryptRequest>) -> Result<impl IntoRes
     );
     let _guard = request_span.enter();
 
-    tracing::debug!("Retrieving public key for encryption");
-    let account = get_key(request.turbo_da_app_id).await?;
-
-    let public_key = account
-        .credential()
-        .verifying_key()
-        .to_encoded_point(false)
-        .as_bytes()
-        .to_vec();
-
-    tracing::debug!("Encrypting plaintext");
-    let ecies_result = ecies::encrypt(&public_key, &request.plaintext).map_err(|e| {
-        tracing::error!(error = %e, "Encryption failed");
-        AppError::EncryptionError(e.to_string())
-    })?;
+    // Use shared encryption function
+    tracing::debug!("Encrypting plaintext using shared utils::encrypt()");
+    let ecies_result = utils::encrypt(request.turbo_da_app_id, &request.plaintext).await?;
 
     let key_size = ecies::config::get_ephemeral_key_size();
     let (ephemeral_pub_key, ciphertext) = ecies_result.split_at(key_size);
+
+    // Get account for signing
+    tracing::debug!("Retrieving key for signing");
+    let account = utils::get_key(request.turbo_da_app_id).await?;
 
     let message_hash = keccak256(ciphertext);
     let signature_ciphertext = account.sign_hash(&message_hash).await.map_err(|e| {
@@ -71,6 +84,7 @@ pub async fn encrypt(Json(request): Json<EncryptRequest>) -> Result<impl IntoRes
         ciphertext_length = ciphertext.len(),
         "Successfully encrypted data"
     );
+
 
     Ok(Json(EncryptResponse {
         ciphertext: ciphertext.to_vec(),

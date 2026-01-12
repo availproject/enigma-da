@@ -1,9 +1,10 @@
 use crate::{
     api::encrypt::encrypt,
-    tests::cleanup_test_files,
+    db,
+    tests::{cleanup_test_files, setup_test_db},
     types::{EncryptRequest, EncryptResponse},
 };
-use axum::{Json, response::IntoResponse};
+use axum::{Json, extract::State, response::IntoResponse};
 use http_body_util::BodyExt;
 use uuid::Uuid;
 
@@ -16,16 +17,33 @@ async fn test_encrypt_request_endpoint() {
 
     println!("Starting P2P nodes");
 
+    // Setup test database
+    let pool = setup_test_db().await;
+    let turbo_da_app_id = Uuid::new_v4();
+
+    // Register app with threshold
+    db::register_app(&pool, &turbo_da_app_id.to_string(), 2)
+        .await
+        .expect("Failed to register app");
+
+    // Add participants
+    db::add_participant(&pool, &turbo_da_app_id.to_string(), "0x1234567890123456789012345678901234567890")
+        .await
+        .expect("Failed to add participant 1");
+    db::add_participant(&pool, &turbo_da_app_id.to_string(), "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
+        .await
+        .expect("Failed to add participant 2");
+
     // Wait a bit for registration to complete
     tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
 
     // Encrypt the plaintext
     let request = EncryptRequest {
         plaintext: vec![0; 32],
-        turbo_da_app_id: Uuid::new_v4(),
+        turbo_da_app_id,
     };
 
-    let response = encrypt(Json(request.clone())).await.unwrap();
+    let response = encrypt(State(pool), Json(request.clone())).await.unwrap();
 
     let response_body = response.into_response().into_body();
     let response: EncryptResponse =

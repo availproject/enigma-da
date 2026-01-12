@@ -1,0 +1,27 @@
+services:
+  enigma-da-service:
+    image: enigma-da-service:local
+    container_name: enigma-da-service-local
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    ports:
+      - "3000:3000"
+    environment:
+      RUST_LOG: debug
+      RUST_BACKTRACE: full
+      SERVER_PORT: 3000
+      SERVER_HOST: 0.0.0.0
+    volumes:
+      - /var/run/dstack.sock:/var/run/dstack.sock
+      - ./data:/app/data
+      # Mount local certificate files for debug builds
+      - ./certs/ca.crt:/app/ca.crt:ro
+      - ./certs/server.crt:/app/server.crt:ro
+      - ./certs/server.key:/app/server.key:ro
+    command: ["/app/start.sh"]
+
+# Note: Place your certificate files in ./certs/ directory:
+#   - ca.crt
+#   - server.crt
+#   - server.key

@@ -4,6 +4,66 @@ mod encrypt;
 use glob::glob;
 use std::fs;
 use tracing::debug;
+use sqlx::SqlitePool;
+
+/// Helper function to create a test database with all required tables
+pub async fn setup_test_db() -> SqlitePool {
+    let pool = SqlitePool::connect("sqlite::memory:")
+        .await
+        .expect("Failed to create test database");
+    
+    // Create apps table
+    sqlx::query(
+        r#"
+        CREATE TABLE apps (
+            turbo_da_app_id TEXT PRIMARY KEY NOT NULL,
+            threshold INTEGER NOT NULL,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        )
+        "#,
+    )
+    .execute(&pool)
+    .await
+    .expect("Failed to create apps table");
+
+    // Create mpc_participants table
+    sqlx::query(
+        r#"
+        CREATE TABLE mpc_participants (
+            turbo_da_app_id TEXT NOT NULL,
+            address TEXT NOT NULL,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            PRIMARY KEY (turbo_da_app_id, address),
+            FOREIGN KEY (turbo_da_app_id) REFERENCES apps(turbo_da_app_id)
+        )
+        "#,
+    )
+    .execute(&pool)
+    .await
+    .expect("Failed to create mpc_participants table");
+
+    // Create decryption_requests table
+    sqlx::query(
+        r#"
+        CREATE TABLE decryption_requests (
+            id TEXT PRIMARY KEY NOT NULL,
+            turbo_da_app_id TEXT NOT NULL,
+            ciphertext BLOB NOT NULL,
+            submitted_signatures TEXT NOT NULL DEFAULT '[]',
+            decrypted_data BLOB,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            completed_at INTEGER,
+            FOREIGN KEY (turbo_da_app_id) REFERENCES apps(turbo_da_app_id)
+        )
+        "#,
+    )
+    .execute(&pool)
+    .await
+    .expect("Failed to create decryption_requests table");
+
+    pool
+}
 
 pub async fn cleanup_test_files() {
     println!("🧹 Cleaning up test files...");
