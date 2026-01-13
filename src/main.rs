@@ -127,9 +127,10 @@ async fn main() -> anyhow::Result<()> {
             tracing::info!("Reading server key from environment variable");
             let key_normalized = normalize_cert(key_content);
 
-            pkcs8_private_keys(&mut Cursor::new(key_normalized.as_bytes()))
+            let x  = pkcs8_private_keys(&mut Cursor::new(key_normalized.as_bytes()))
                 .next()
-                .ok_or_else(|| anyhow::anyhow!("No private key found"))??
+                .ok_or_else(|| anyhow::anyhow!("No private key found"))??;
+        x
         } else {
             pkcs8_private_keys(&mut BufReader::new(File::open("server.key")?))
                 .next()
