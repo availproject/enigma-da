@@ -67,8 +67,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/delete_participant", delete(delete_participant))
         .route("/v1/encrypt", post(encrypt))
         .route("/v1/create_decrypt_request", post(create_decrypt_request))
-        .route("/v1/decrypt_request/:id", get(get_decrypt_request))
-        .route("/v1/decrypt_request/:id/signatures", post(submit_signature))
+        .route("/v1/decrypt_request/{id}", get(get_decrypt_request))
+        .route("/v1/decrypt_request/{id}/signatures", post(submit_signature))
         .layer(TraceLayer::new_for_http())
         .with_state(db_pool);
 
@@ -127,10 +127,10 @@ async fn main() -> anyhow::Result<()> {
             tracing::info!("Reading server key from environment variable");
             let key_normalized = normalize_cert(key_content);
 
-            let x  = pkcs8_private_keys(&mut Cursor::new(key_normalized.as_bytes()))
+            let x = pkcs8_private_keys(&mut Cursor::new(key_normalized.as_bytes()))
                 .next()
                 .ok_or_else(|| anyhow::anyhow!("No private key found"))??;
-        x
+            x
         } else {
             pkcs8_private_keys(&mut BufReader::new(File::open("server.key")?))
                 .next()

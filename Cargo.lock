@@ -1514,7 +1514,7 @@ dependencies = [
 
 [[package]]
 name = "enigma-da"
-version = "0.0.7"
+version = "0.1.12"
 dependencies = [
  "alloy",
  "alloy-primitives",
