@@ -27,6 +27,10 @@ pub async fn create_decrypt_request(
     let _guard = request_span.enter();
 
     if request.ciphertext.is_empty() {
+        tracing::debug!(
+            app_id = %request.turbo_da_app_id,
+            "Rejecting decrypt request: empty ciphertext provided"
+        );
         return Err(AppError::InvalidInput(
             "Ciphertext must not be empty".into(),
         ));
@@ -46,14 +50,29 @@ pub async fn create_decrypt_request(
             AppError::Database(format!("Failed to get app threshold: {}", e))
         })?
         .ok_or_else(|| {
+            tracing::debug!(
+                app_id = %turbo_da_app_id_str,
+                "App not found in database - registration required"
+            );
             AppError::InvalidInput("App not registered. Please register the app first.".into())
         })?;
 
     let signers = db::get_participants(&pool, &turbo_da_app_id_str)
         .await
-        .map_err(|e| AppError::Database(format!("Failed to get participants: {}", e)))?;
+        .map_err(|e| {
+            tracing::error!(
+                error = %e,
+                app_id = %turbo_da_app_id_str,
+                "Database error while fetching participants"
+            );
+            AppError::Database(format!("Failed to get participants: {}", e))
+        })?;
 
     if signers.is_empty() {
+        tracing::debug!(
+            app_id = %turbo_da_app_id_str,
+            "No participants registered for app - cannot create decrypt request"
+        );
         return Err(AppError::InvalidInput(
             "No registered participants found. Cannot create decryption request.".into(),
         ));
@@ -68,7 +87,15 @@ pub async fn create_decrypt_request(
         &request.ciphertext,
     )
     .await
-    .map_err(|e| AppError::Database(format!("Failed to create decryption request: {}", e)))?;
+    .map_err(|e| {
+        tracing::error!(
+            error = %e,
+            request_id = %request_id,
+            app_id = %turbo_da_app_id_str,
+            "Database error while creating decryption request"
+        );
+        AppError::Database(format!("Failed to create decryption request: {}", e))
+    })?;
 
     tracing::info!(
         request_id = %request_id,
@@ -95,16 +122,39 @@ pub async fn get_decrypt_request(
 
     let record = db::get_decryption_request(&pool, &request_id)
         .await
-        .map_err(|e| AppError::Database(format!("Failed to fetch decryption request: {}", e)))?
-        .ok_or_else(|| AppError::RequestNotFound(request_id.clone()))?;
+        .map_err(|e| {
+            tracing::error!(
+                error = %e,
+                request_id = %request_id,
+                "Database error while fetching decryption request"
+            );
+            AppError::Database(format!("Failed to fetch decryption request: {}", e))
+        })?
+        .ok_or_else(|| {
+            tracing::debug!(
+                request_id = %request_id,
+                "Decryption request not found in database"
+            );
+            AppError::RequestNotFound(request_id.clone())
+        })?;
 
     let signers = db::get_participants(&pool, &record.turbo_da_app_id)
         .await
-        .map_err(|e| AppError::Database(format!("Failed to get participants: {}", e)))?;
+        .map_err(|e| {
+            tracing::error!(
+                error = %e,
+                request_id = %request_id,
+                app_id = %record.turbo_da_app_id,
+                "Database error while fetching participants for decrypt request"
+            );
+            AppError::Database(format!("Failed to get participants: {}", e))
+        })?;
 
-    tracing::info!(
+    tracing::debug!(
         request_id = %request_id,
         status = %record.status,
+        app_id = %record.turbo_da_app_id,
+        signers_count = signers.len(),
         "Decryption request retrieved successfully"
     );
 
@@ -130,10 +180,31 @@ pub async fn submit_signature(
 
     let record = db::get_decryption_request(&pool, &request_id)
         .await
-        .map_err(|e| AppError::Database(format!("Failed to fetch decryption request: {}", e)))?
-        .ok_or_else(|| AppError::RequestNotFound(request_id.clone()))?;
+        .map_err(|e| {
+            tracing::error!(
+                error = %e,
+                request_id = %request_id,
+                participant = %request.participant_address,
+                "Database error while fetching decryption request for signature submission"
+            );
+            AppError::Database(format!("Failed to fetch decryption request: {}", e))
+        })?
+        .ok_or_else(|| {
+            tracing::debug!(
+                request_id = %request_id,
+                participant = %request.participant_address,
+                "Cannot submit signature: decryption request not found"
+            );
+            AppError::RequestNotFound(request_id.clone())
+        })?;
 
     if record.status != "pending" {
+        tracing::debug!(
+            request_id = %request_id,
+            participant = %request.participant_address,
+            current_status = %record.status,
+            "Cannot submit signature: request not in pending state"
+        );
         return Err(AppError::InvalidInput(format!(
             "Decryption request is in '{}' state, cannot accept signatures",
             record.status
@@ -142,7 +213,15 @@ pub async fn submit_signature(
 
     let signers = db::get_participants(&pool, &record.turbo_da_app_id)
         .await
-        .map_err(|e| AppError::Database(format!("Failed to get participants: {}", e)))?;
+        .map_err(|e| {
+            tracing::error!(
+                error = %e,
+                request_id = %request_id,
+                app_id = %record.turbo_da_app_id,
+                "Database error while fetching participants for signature verification"
+            );
+            AppError::Database(format!("Failed to get participants: {}", e))
+        })?;
 
     if !signers.contains(&request.participant_address) {
         tracing::warn!(
@@ -168,6 +247,11 @@ pub async fn submit_signature(
     })?;
 
     if !submitted {
+        tracing::debug!(
+            request_id = %request_id,
+            participant = %request.participant_address,
+            "Duplicate signature submission rejected"
+        );
         return Err(AppError::InvalidInput(
             "Signature already submitted by this participant".into(),
         ));
@@ -176,12 +260,29 @@ pub async fn submit_signature(
     let updated_record = db::get_decryption_request(&pool, &request_id)
         .await
         .map_err(|e| {
+            tracing::error!(
+                error = %e,
+                request_id = %request_id,
+                "Database error while fetching updated decryption request after signature submission"
+            );
             AppError::Database(format!("Failed to fetch updated decryption request: {}", e))
         })?
-        .ok_or_else(|| AppError::RequestNotFound(request_id.clone()))?;
+        .ok_or_else(|| {
+            tracing::error!(
+                request_id = %request_id,
+                "Decryption request disappeared after signature submission - possible data corruption"
+            );
+            AppError::RequestNotFound(request_id.clone())
+        })?;
 
     let submitted_signatures: Vec<serde_json::Value> =
         serde_json::from_str(&updated_record.submitted_signatures).map_err(|e| {
+            tracing::error!(
+                error = %e,
+                request_id = %request_id,
+                raw_signatures = %updated_record.submitted_signatures,
+                "Failed to parse submitted signatures JSON"
+            );
             AppError::Internal(format!("Failed to parse submitted signatures: {}", e))
         })?;
 
@@ -189,14 +290,40 @@ pub async fn submit_signature(
 
     let threshold = db::get_app_threshold(&pool, &updated_record.turbo_da_app_id)
         .await
-        .map_err(|e| AppError::Database(format!("Failed to get app threshold: {}", e)))?
-        .ok_or_else(|| AppError::Internal("App not found".into()))?;
+        .map_err(|e| {
+            tracing::error!(
+                error = %e,
+                request_id = %request_id,
+                app_id = %updated_record.turbo_da_app_id,
+                "Database error while fetching app threshold for signature verification"
+            );
+            AppError::Database(format!("Failed to get app threshold: {}", e))
+        })?
+        .ok_or_else(|| {
+            tracing::error!(
+                request_id = %request_id,
+                app_id = %updated_record.turbo_da_app_id,
+                "App not found when fetching threshold - possible data corruption"
+            );
+            AppError::Internal("App not found".into())
+        })?;
     let mut verified_signatures_count = 0;
     for sig in &submitted_signatures {
         let participant = sig["participant"].as_str().ok_or_else(|| {
+            tracing::error!(
+                request_id = %request_id,
+                signature_data = %sig,
+                "Invalid signature format: missing participant field"
+            );
             AppError::Internal("Invalid signature format: missing participant".into())
         })?;
         let signature = sig["signature"].as_str().ok_or_else(|| {
+            tracing::error!(
+                request_id = %request_id,
+                participant = participant,
+                signature_data = %sig,
+                "Invalid signature format: missing signature field"
+            );
             AppError::Internal("Invalid signature format: missing signature".into())
         })?;
 
@@ -248,23 +375,69 @@ pub async fn submit_signature(
         );
 
         let turbo_da_app_id = Uuid::parse_str(&updated_record.turbo_da_app_id)
-            .map_err(|e| AppError::Internal(format!("Invalid UUID format: {}", e)))?;
+            .map_err(|e| {
+                tracing::error!(
+                    error = %e,
+                    request_id = %request_id,
+                    app_id_str = %updated_record.turbo_da_app_id,
+                    "Failed to parse turbo_da_app_id as UUID"
+                );
+                AppError::Internal(format!("Invalid UUID format: {}", e))
+            })?;
+
+        tracing::debug!(
+            request_id = %request_id,
+            app_id = %turbo_da_app_id,
+            ciphertext_len = updated_record.ciphertext.len(),
+            "Starting decryption process"
+        );
 
         let plaintext = utils::decrypt(turbo_da_app_id, &updated_record.ciphertext)
             .await
-            .map_err(|e| AppError::DecryptionError(format!("Decryption failed: {}", e)))?;
+            .map_err(|e| {
+                tracing::error!(
+                    error = %e,
+                    request_id = %request_id,
+                    app_id = %turbo_da_app_id,
+                    ciphertext_len = updated_record.ciphertext.len(),
+                    "Decryption operation failed"
+                );
+                AppError::DecryptionError(format!("Decryption failed: {}", e))
+            })?;
+
+        tracing::debug!(
+            request_id = %request_id,
+            plaintext_len = plaintext.len(),
+            "Decryption successful, updating database"
+        );
 
         db::complete_decryption_request(&pool, &request_id, &plaintext)
             .await
             .map_err(|e| {
+                tracing::error!(
+                    error = %e,
+                    request_id = %request_id,
+                    "Database error while completing decryption request"
+                );
                 AppError::Database(format!("Failed to complete decryption request: {}", e))
             })?;
 
         let quote_data = format!("{}:{}", request_id, hex::encode(&plaintext));
         let quote_data_hash = keccak256(quote_data.as_bytes());
 
+        tracing::debug!(
+            request_id = %request_id,
+            quote_data_hash = %hex::encode(quote_data_hash),
+            "Generating TEE attestation quote"
+        );
+
         let tee_quote = utils::quote(quote_data_hash.to_vec()).await.map_err(|e| {
-            tracing::error!(error = %e, "Failed to generate TEE quote");
+            tracing::error!(
+                error = %e,
+                request_id = %request_id,
+                quote_data_hash = %hex::encode(quote_data_hash),
+                "Failed to generate TEE attestation quote"
+            );
             e
         })?;
 
