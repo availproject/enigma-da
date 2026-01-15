@@ -29,24 +29,37 @@
 //!
 //! All tests use an in-memory SQLite database to ensure isolation and repeatability.
 
-use crate::api::decrypt::{create_decrypt_request, get_decrypt_request, submit_signature};
+use crate::api::decrypt::{
+    create_decrypt_request, get_decrypt_request, list_decrypt_requests, submit_signature,
+};
 use crate::api::encrypt::encrypt as create_encrypt_request;
 use crate::db;
 use crate::error::AppError;
 use crate::tests::setup_test_db;
 use crate::types::{
     DecryptRequest, DecryptRequestResponse, EncryptRequest, EncryptResponse,
-    SubmitSignatureRequest, SubmitSignatureResponse,
+    ListDecryptRequestsQuery, ListDecryptRequestsResponse, SubmitSignatureRequest,
+    SubmitSignatureResponse,
 };
 use alloy::signers::{local::LocalSigner, Signer};
 use alloy_primitives::keccak256;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use hex;
 use http_body_util::BodyExt;
 use k256::ecdsa::SigningKey;
+use serde::Deserialize;
 use uuid::Uuid;
+
+/// Response struct for get_decrypt_request that matches the DB record format
+#[derive(Debug, Deserialize)]
+struct GetDecryptRequestResponse {
+    #[serde(rename = "id")]
+    request_id: String,
+    turbo_da_app_id: String,
+    status: String,
+}
 
 /// Helper function to get the address from a private key
 fn get_address_from_private_key(private_key_hex: &str) -> String {
@@ -265,13 +278,12 @@ async fn test_get_decrypt_request_success() {
     assert!(result.is_ok());
     let response = result.unwrap();
     let response_body = response.into_response().into_body();
-    let response: DecryptRequestResponse =
+    let response: GetDecryptRequestResponse =
         serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
 
     assert_eq!(response.request_id, request_id.to_string());
     assert_eq!(response.turbo_da_app_id, turbo_da_app_id.to_string());
     assert_eq!(response.status, "pending");
-    assert_eq!(response.signers.len(), 1);
 }
 
 #[tokio::test]
@@ -553,22 +565,7 @@ async fn test_submit_signature_invalid_signature_format() {
 
     let result = submit_signature(State(pool), Path(request_id.clone()), Json(sig_request)).await;
 
-    // Should succeed but signature verification will fail (not ready to decrypt)
-    // The system accepts the signature but won't count it as verified
-    assert!(result.is_ok());
-
-    let response = result.unwrap();
-    let response_body = response.into_response().into_body();
-    let response: SubmitSignatureResponse =
-        serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
-
-    // Verify no TEE attestation since threshold not met (invalid signature doesn't verify)
-    assert!(
-        response.tee_attestion.is_none(),
-        "TEE attestation should be None when threshold not met"
-    );
-    assert_eq!(response.status, "pending");
-    assert!(!response.ready_to_decrypt);
+    assert!(result.is_err());
 }
 
 // Integration Tests
@@ -614,13 +611,12 @@ async fn test_integration_create_and_retrieve_decrypt_request() {
 
     let get_response = get_result.unwrap();
     let get_response_body = get_response.into_response().into_body();
-    let get_response: DecryptRequestResponse =
+    let get_response: GetDecryptRequestResponse =
         serde_json::from_slice(&get_response_body.collect().await.unwrap().to_bytes()).unwrap();
 
     assert_eq!(get_response.request_id, request_id);
     assert_eq!(get_response.turbo_da_app_id, turbo_da_app_id.to_string());
     assert_eq!(get_response.status, "pending");
-    assert_eq!(get_response.signers.len(), 2);
 }
 
 #[tokio::test]
@@ -871,7 +867,7 @@ async fn test_integration_signature_verification_workflow() {
 
     let get_response = get_result.unwrap();
     let get_response_body = get_response.into_response().into_body();
-    let get_response: DecryptRequestResponse =
+    let get_response: GetDecryptRequestResponse =
         serde_json::from_slice(&get_response_body.collect().await.unwrap().to_bytes()).unwrap();
 
     // Verify the request has been updated
@@ -1185,4 +1181,270 @@ async fn test_edge_case_large_ciphertext() {
         .await
         .expect("Failed to fetch request")
         .expect("Request not found");
+}
+
+#[tokio::test]
+async fn test_list_decrypt_requests_success() {
+    let pool = setup_test_db().await;
+    let turbo_da_app_id = Uuid::new_v4();
+
+    // Setup app with threshold and participants
+    db::register_app(&pool, &turbo_da_app_id.to_string(), 2)
+        .await
+        .expect("Failed to register app");
+    db::add_participant(&pool, &turbo_da_app_id.to_string(), TEST_ADDRESS_1)
+        .await
+        .expect("Failed to add participant");
+    db::add_participant(&pool, &turbo_da_app_id.to_string(), TEST_ADDRESS_2)
+        .await
+        .expect("Failed to add participant");
+
+    // Create multiple decryption requests
+    let ciphertext1 = vec![1, 2, 3, 4];
+    let ciphertext2 = vec![5, 6, 7, 8];
+    let ciphertext3 = vec![9, 10, 11, 12];
+
+    let submission_id1 = Uuid::new_v4();
+    let submission_id2 = Uuid::new_v4();
+    let submission_id3 = Uuid::new_v4();
+
+    db::create_decryption_request(
+        &pool,
+        &submission_id1.to_string(),
+        &turbo_da_app_id.to_string(),
+        &ciphertext1,
+    )
+    .await
+    .expect("Failed to create request 1");
+
+    db::create_decryption_request(
+        &pool,
+        &submission_id2.to_string(),
+        &turbo_da_app_id.to_string(),
+        &ciphertext2,
+    )
+    .await
+    .expect("Failed to create request 2");
+
+    db::create_decryption_request(
+        &pool,
+        &submission_id3.to_string(),
+        &turbo_da_app_id.to_string(),
+        &ciphertext3,
+    )
+    .await
+    .expect("Failed to create request 3");
+
+    // Test listing all requests
+    let query = ListDecryptRequestsQuery {
+        turbo_da_app_id: turbo_da_app_id.to_string(),
+        offset: None,
+        limit: None,
+    };
+
+    let result = list_decrypt_requests(State(pool.clone()), Query(query)).await;
+    assert!(result.is_ok());
+
+    let response = result.unwrap();
+    let response_body = response.into_response().into_body();
+    let response: ListDecryptRequestsResponse =
+        serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
+
+    assert_eq!(response.total, 3);
+    assert_eq!(response.items.len(), 3);
+    assert_eq!(response.offset, 0);
+    assert_eq!(response.limit, 50); // default limit
+
+    // Verify items are ordered by created_at DESC (most recent first)
+    for item in &response.items {
+        assert_eq!(item.turbo_da_app_id, turbo_da_app_id.to_string());
+        assert_eq!(item.status, "pending");
+        assert_eq!(item.threshold, 2);
+    }
+}
+
+#[tokio::test]
+async fn test_list_decrypt_requests_with_pagination() {
+    let pool = setup_test_db().await;
+    let turbo_da_app_id = Uuid::new_v4();
+
+    // Setup
+    db::register_app(&pool, &turbo_da_app_id.to_string(), 1)
+        .await
+        .expect("Failed to register app");
+    db::add_participant(&pool, &turbo_da_app_id.to_string(), TEST_ADDRESS_1)
+        .await
+        .expect("Failed to add participant");
+
+    // Create 5 decryption requests
+    for i in 0..5 {
+        db::create_decryption_request(
+            &pool,
+            &Uuid::new_v4().to_string(),
+            &turbo_da_app_id.to_string(),
+            &vec![i as u8],
+        )
+        .await
+        .expect("Failed to create request");
+    }
+
+    // Test with limit of 2
+    let query = ListDecryptRequestsQuery {
+        turbo_da_app_id: turbo_da_app_id.to_string(),
+        offset: Some(0),
+        limit: Some(2),
+    };
+
+    let result = list_decrypt_requests(State(pool.clone()), Query(query)).await;
+    assert!(result.is_ok());
+
+    let response = result.unwrap();
+    let response_body = response.into_response().into_body();
+    let response: ListDecryptRequestsResponse =
+        serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
+
+    assert_eq!(response.total, 5);
+    assert_eq!(response.items.len(), 2);
+    assert_eq!(response.offset, 0);
+    assert_eq!(response.limit, 2);
+
+    // Test with offset of 2, limit of 2
+    let query = ListDecryptRequestsQuery {
+        turbo_da_app_id: turbo_da_app_id.to_string(),
+        offset: Some(2),
+        limit: Some(2),
+    };
+
+    let result = list_decrypt_requests(State(pool.clone()), Query(query)).await;
+    assert!(result.is_ok());
+
+    let response = result.unwrap();
+    let response_body = response.into_response().into_body();
+    let response: ListDecryptRequestsResponse =
+        serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
+
+    assert_eq!(response.total, 5);
+    assert_eq!(response.items.len(), 2);
+    assert_eq!(response.offset, 2);
+    assert_eq!(response.limit, 2);
+}
+
+#[tokio::test]
+async fn test_list_decrypt_requests_empty() {
+    let pool = setup_test_db().await;
+    let turbo_da_app_id = Uuid::new_v4();
+
+    // Setup app but don't create any requests
+    db::register_app(&pool, &turbo_da_app_id.to_string(), 1)
+        .await
+        .expect("Failed to register app");
+    db::add_participant(&pool, &turbo_da_app_id.to_string(), TEST_ADDRESS_1)
+        .await
+        .expect("Failed to add participant");
+
+    let query = ListDecryptRequestsQuery {
+        turbo_da_app_id: turbo_da_app_id.to_string(),
+        offset: None,
+        limit: None,
+    };
+
+    let result = list_decrypt_requests(State(pool.clone()), Query(query)).await;
+    assert!(result.is_ok());
+
+    let response = result.unwrap();
+    let response_body = response.into_response().into_body();
+    let response: ListDecryptRequestsResponse =
+        serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
+
+    assert_eq!(response.total, 0);
+    assert_eq!(response.items.len(), 0);
+}
+
+#[tokio::test]
+async fn test_list_decrypt_requests_filters_by_app_id() {
+    let pool = setup_test_db().await;
+    let app_id1 = Uuid::new_v4();
+    let app_id2 = Uuid::new_v4();
+
+    // Setup two different apps
+    db::register_app(&pool, &app_id1.to_string(), 1)
+        .await
+        .expect("Failed to register app1");
+    db::add_participant(&pool, &app_id1.to_string(), TEST_ADDRESS_1)
+        .await
+        .expect("Failed to add participant to app1");
+
+    db::register_app(&pool, &app_id2.to_string(), 2)
+        .await
+        .expect("Failed to register app2");
+    db::add_participant(&pool, &app_id2.to_string(), TEST_ADDRESS_2)
+        .await
+        .expect("Failed to add participant to app2");
+
+    // Create 3 requests for app1 and 2 requests for app2
+    for _ in 0..3 {
+        db::create_decryption_request(
+            &pool,
+            &Uuid::new_v4().to_string(),
+            &app_id1.to_string(),
+            &vec![1, 2, 3],
+        )
+        .await
+        .expect("Failed to create request for app1");
+    }
+
+    for _ in 0..2 {
+        db::create_decryption_request(
+            &pool,
+            &Uuid::new_v4().to_string(),
+            &app_id2.to_string(),
+            &vec![4, 5, 6],
+        )
+        .await
+        .expect("Failed to create request for app2");
+    }
+
+    // List requests for app1 only
+    let query = ListDecryptRequestsQuery {
+        turbo_da_app_id: app_id1.to_string(),
+        offset: None,
+        limit: None,
+    };
+
+    let result = list_decrypt_requests(State(pool.clone()), Query(query)).await;
+    assert!(result.is_ok());
+
+    let response = result.unwrap();
+    let response_body = response.into_response().into_body();
+    let response: ListDecryptRequestsResponse =
+        serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
+
+    assert_eq!(response.total, 3);
+    assert_eq!(response.items.len(), 3);
+    for item in &response.items {
+        assert_eq!(item.turbo_da_app_id, app_id1.to_string());
+        assert_eq!(item.threshold, 1);
+    }
+
+    // List requests for app2 only
+    let query = ListDecryptRequestsQuery {
+        turbo_da_app_id: app_id2.to_string(),
+        offset: None,
+        limit: None,
+    };
+
+    let result = list_decrypt_requests(State(pool.clone()), Query(query)).await;
+    assert!(result.is_ok());
+
+    let response = result.unwrap();
+    let response_body = response.into_response().into_body();
+    let response: ListDecryptRequestsResponse =
+        serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
+
+    assert_eq!(response.total, 2);
+    assert_eq!(response.items.len(), 2);
+    for item in &response.items {
+        assert_eq!(item.turbo_da_app_id, app_id2.to_string());
+        assert_eq!(item.threshold, 2);
+    }
 }

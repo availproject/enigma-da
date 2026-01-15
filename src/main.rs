@@ -4,7 +4,7 @@ use std::fs::File;
 use crate::{
     api::{
         add_participant, create_decrypt_request, delete_participant, encrypt, get_decrypt_request,
-        health, register, submit_signature,
+        health, list_decrypt_requests, register, submit_signature,
     },
     config::ServerConfig,
     tracer::{init_tracer, TracingConfig},
@@ -67,6 +67,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/delete_participant", delete(delete_participant))
         .route("/v1/encrypt", post(encrypt))
         .route("/v1/create_decrypt_request", post(create_decrypt_request))
+        .route("/v1/decrypt_requests", get(list_decrypt_requests))
         .route("/v1/decrypt_request/{id}", get(get_decrypt_request))
         .route("/v1/decrypt_request/{id}/signatures", post(submit_signature))
         .layer(TraceLayer::new_for_http())

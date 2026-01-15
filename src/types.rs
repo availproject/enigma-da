@@ -3,6 +3,8 @@ use dstack_sdk::dstack_client::GetQuoteResponse;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::db::DecryptionRequestListWithThreshold;
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct EncryptRequest {
     #[serde(with = "serde_bytes")]
@@ -100,4 +102,30 @@ pub struct DeleteParticipantRequest {
 pub struct DeleteParticipantResponse {
     pub turbo_da_app_id: String,
     pub participants_deleted: usize,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListDecryptRequestsQuery {
+    pub turbo_da_app_id: String,
+    pub offset: Option<u32>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ListDecryptRequestsResponse {
+    pub items: Vec<DecryptionRequestListWithThreshold>,
+    pub total: u32,
+    pub offset: u32,
+    pub limit: u32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DecryptRequestItem {
+    pub request_id: String,
+    pub turbo_da_app_id: String,
+    pub status: String,
+    pub signatures_submitted: usize,
+    pub threshold: i64,
+    pub ready_to_decrypt: bool,
+    pub created_at: i64,
 }

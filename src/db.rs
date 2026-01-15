@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use std::path::Path;
 use std::time::Duration;
@@ -345,7 +346,7 @@ pub async fn complete_decryption_request(
     Ok(result.rows_affected() > 0)
 }
 
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone, sqlx::FromRow, Serialize)]
 pub struct DecryptionRequestRecord {
     pub id: String,
     pub turbo_da_app_id: String,
@@ -355,4 +356,49 @@ pub struct DecryptionRequestRecord {
     pub status: String,
     pub created_at: i64,
     pub completed_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, sqlx::FromRow, Deserialize, Serialize)]
+pub struct DecryptionRequestListWithThreshold {
+    pub id: String,
+    pub turbo_da_app_id: String,
+    pub submitted_signatures: String,
+    pub status: String,
+    pub created_at: i64,
+    pub completed_at: Option<i64>,
+    pub threshold: i64,
+}
+
+pub async fn list_decryption_requests(
+    pool: &SqlitePool,
+    turbo_da_app_id: &str,
+    offset: u32,
+    limit: u32,
+) -> Result<(Vec<DecryptionRequestListWithThreshold>, u32), sqlx::Error> {
+    let total: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM decryption_requests WHERE turbo_da_app_id = ?",
+    )
+    .bind(turbo_da_app_id)
+    .fetch_one(pool)
+    .await?;
+
+    let records = sqlx::query_as::<_, DecryptionRequestListWithThreshold>(
+        r#"
+        SELECT dr.id, dr.turbo_da_app_id, 
+               dr.submitted_signatures, dr.status,
+               dr.created_at, dr.completed_at, a.threshold
+        FROM decryption_requests dr
+        JOIN apps a ON dr.turbo_da_app_id = a.turbo_da_app_id
+        WHERE dr.turbo_da_app_id = ?
+        ORDER BY dr.created_at DESC
+        LIMIT ? OFFSET ?
+        "#,
+    )
+    .bind(turbo_da_app_id)
+    .bind(limit as i64)
+    .bind(offset as i64)
+    .fetch_all(pool)
+    .await?;
+
+    Ok((records, total as u32))
 }

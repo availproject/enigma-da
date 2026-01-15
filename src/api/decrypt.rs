@@ -2,13 +2,14 @@ use crate::{
     db,
     error::AppError,
     types::{
-        DecryptRequest, DecryptRequestResponse, SubmitSignatureRequest, SubmitSignatureResponse,
+        DecryptRequest, DecryptRequestResponse, ListDecryptRequestsQuery,
+        ListDecryptRequestsResponse, SubmitSignatureRequest, SubmitSignatureResponse,
     },
     utils,
 };
 use alloy_primitives::keccak256;
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     response::IntoResponse,
     Json,
 };
@@ -78,7 +79,6 @@ pub async fn create_decrypt_request(
         ));
     }
 
-
     db::create_decryption_request(
         &pool,
         &request.submission_id.to_string().as_str(),
@@ -118,7 +118,6 @@ pub async fn get_decrypt_request(
     Path(request_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, AppError> {
     tracing::info!(request_id = %request_id, "Fetching decryption request status");
-
     let record = db::get_decryption_request(&pool, &request_id.to_string())
         .await
         .map_err(|e| {
@@ -137,33 +136,14 @@ pub async fn get_decrypt_request(
             AppError::RequestNotFound(request_id.to_string())
         })?;
 
-    let signers = db::get_participants(&pool, &record.turbo_da_app_id)
-        .await
-        .map_err(|e| {
-            tracing::error!(
-                error = %e,
-                request_id = %request_id,
-                app_id = %record.turbo_da_app_id,
-                "Database error while fetching participants for decrypt request"
-            );
-            AppError::Database(format!("Failed to get participants: {}", e))
-        })?;
-
     tracing::debug!(
         request_id = %request_id,
         status = %record.status,
         app_id = %record.turbo_da_app_id,
-        signers_count = signers.len(),
         "Decryption request retrieved successfully"
     );
 
-    Ok(Json(DecryptRequestResponse {
-        request_id: record.id,
-        turbo_da_app_id: record.turbo_da_app_id,
-        status: record.status,
-        signers,
-        created_at: record.created_at,
-    }))
+    Ok(Json(record))
 }
 
 pub async fn submit_signature(
@@ -231,6 +211,34 @@ pub async fn submit_signature(
         return Err(AppError::InvalidInput(
             "Participant not authorized for this decryption request".into(),
         ));
+    }
+    let ciphertext_hash = keccak256(&record.ciphertext);
+    let message = format!("{:?}{}", ciphertext_hash, record.turbo_da_app_id);
+    // Verify the signature against the request_id
+    match utils::verify_ecdsa_signature(&message, &request.signature, &request.participant_address)
+    {
+        Ok(true) => {
+            tracing::debug!(
+                participant = request.participant_address,
+                request_id = %request_id,
+                "Signature verified successfully"
+            );
+        }
+        Ok(false) => {
+            tracing::warn!(
+                participant = request.participant_address,
+                request_id = %request_id,
+                "Signature verification failed"
+            );
+        }
+        Err(e) => {
+            tracing::error!(
+                error = %e,
+                participant = request.participant_address,
+                request_id = %request_id,
+                "Error verifying signature"
+            );
+        }
     }
 
     let submitted = db::submit_signature(
@@ -306,62 +314,13 @@ pub async fn submit_signature(
             );
             AppError::Internal("App not found".into())
         })?;
-    let mut verified_signatures_count = 0;
-    for sig in &submitted_signatures {
-        let participant = sig["participant"].as_str().ok_or_else(|| {
-            tracing::error!(
-                request_id = %request_id,
-                signature_data = %sig,
-                "Invalid signature format: missing participant field"
-            );
-            AppError::Internal("Invalid signature format: missing participant".into())
-        })?;
-        let signature = sig["signature"].as_str().ok_or_else(|| {
-            tracing::error!(
-                request_id = %request_id,
-                participant = participant,
-                signature_data = %sig,
-                "Invalid signature format: missing signature field"
-            );
-            AppError::Internal("Invalid signature format: missing signature".into())
-        })?;
 
-        let ciphertext_hash = keccak256(&record.ciphertext);
-        let message = format!("{:?}{}", ciphertext_hash, record.turbo_da_app_id);
-        // Verify the signature against the request_id
-        match utils::verify_ecdsa_signature(&message, signature, participant) {
-            Ok(true) => {
-                verified_signatures_count += 1;
-                tracing::debug!(
-                    participant = participant,
-                    request_id = %request_id,
-                    "Signature verified successfully"
-                );
-            }
-            Ok(false) => {
-                tracing::warn!(
-                    participant = participant,
-                    request_id = %request_id,
-                    "Signature verification failed"
-                );
-            }
-            Err(e) => {
-                tracing::error!(
-                    error = %e,
-                    participant = participant,
-                    request_id = %request_id,
-                    "Error verifying signature"
-                );
-            }
-        }
-    }
-
-    let ready_to_decrypt = verified_signatures_count >= threshold as usize;
+    let ready_to_decrypt = signatures_count >= threshold as usize;
 
     tracing::info!(
         request_id = %request_id,
         signatures_count = signatures_count,
-        verified_signatures_count = verified_signatures_count,
+        verified_signatures_count = signatures_count,
         threshold = threshold,
         ready_to_decrypt = ready_to_decrypt,
         "Signature submitted successfully"
@@ -373,16 +332,15 @@ pub async fn submit_signature(
             "Threshold met, performing decryption"
         );
 
-        let turbo_da_app_id = Uuid::parse_str(&updated_record.turbo_da_app_id)
-            .map_err(|e| {
-                tracing::error!(
-                    error = %e,
-                    request_id = %request_id,
-                    app_id_str = %updated_record.turbo_da_app_id,
-                    "Failed to parse turbo_da_app_id as UUID"
-                );
-                AppError::Internal(format!("Invalid UUID format: {}", e))
-            })?;
+        let turbo_da_app_id = Uuid::parse_str(&updated_record.turbo_da_app_id).map_err(|e| {
+            tracing::error!(
+                error = %e,
+                request_id = %request_id,
+                app_id_str = %updated_record.turbo_da_app_id,
+                "Failed to parse turbo_da_app_id as UUID"
+            );
+            AppError::Internal(format!("Invalid UUID format: {}", e))
+        })?;
 
         tracing::debug!(
             request_id = %request_id,
@@ -467,4 +425,39 @@ pub async fn submit_signature(
             tee_attestion: None,
         }))
     }
+}
+
+pub async fn list_decrypt_requests(
+    State(pool): State<SqlitePool>,
+    Query(query): Query<ListDecryptRequestsQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    let offset = query.offset.unwrap_or(0);
+    let limit = query.limit.unwrap_or(50).min(100);
+
+    tracing::info!(
+        turbo_da_app_id = %query.turbo_da_app_id,
+        offset = offset,
+        limit = limit,
+        "Listing decryption requests"
+    );
+
+    let (records, total) =
+        db::list_decryption_requests(&pool, &query.turbo_da_app_id, offset, limit)
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "Database error while listing decryption requests");
+                AppError::Database(format!("Failed to list decryption requests: {}", e))
+            })?;
+    tracing::debug!(
+        total = total,
+        returned = records.len(),
+        "Decryption requests listed successfully"
+    );
+
+    Ok(Json(ListDecryptRequestsResponse {
+        items: records,
+        total,
+        offset,
+        limit,
+    }))
 }
