@@ -81,7 +81,7 @@ pub async fn create_decrypt_request(
 
     db::create_decryption_request(
         &pool,
-        &request.submission_id.to_string().as_str(),
+        &request.id.to_string().as_str(),
         &turbo_da_app_id_str,
         &request.ciphertext,
     )
@@ -89,7 +89,7 @@ pub async fn create_decrypt_request(
     .map_err(|e| {
         tracing::error!(
             error = %e,
-            request_id = %request.submission_id,
+            request_id = %request.id,
             app_id = %turbo_da_app_id_str,
             "Database error while creating decryption request"
         );
@@ -97,7 +97,7 @@ pub async fn create_decrypt_request(
     })?;
 
     tracing::info!(
-        request_id = %request.submission_id,
+        request_id = %request.id,
         app_id = %turbo_da_app_id_str,
         signer_count = signers.len(),
         threshold = threshold,
@@ -105,7 +105,7 @@ pub async fn create_decrypt_request(
     );
 
     Ok(Json(DecryptRequestResponse {
-        request_id: request.submission_id.to_string(),
+        id: request.id.to_string(),
         turbo_da_app_id: turbo_da_app_id_str,
         status: "pending".to_string(),
         signers,
@@ -404,7 +404,7 @@ pub async fn submit_signature(
         );
 
         Ok(Json(SubmitSignatureResponse {
-            request_id,
+            id: request_id,
             status: "completed".to_string(),
             signatures_submitted: signatures_count,
             threshold,
@@ -413,7 +413,7 @@ pub async fn submit_signature(
         }))
     } else {
         Ok(Json(SubmitSignatureResponse {
-            request_id,
+            id:request_id,
             status: if ready_to_decrypt {
                 "completed".to_string()
             } else {

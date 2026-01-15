@@ -31,13 +31,13 @@ pub struct QuoteResponse {
 #[derive(Debug, Deserialize, Clone)]
 pub struct DecryptRequest {
     pub turbo_da_app_id: Uuid,
-    pub submission_id:Uuid,
+    pub id:Uuid,
     pub ciphertext: Vec<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DecryptRequestResponse {
-    pub request_id: String,
+    pub id: String,
     pub turbo_da_app_id: String,
     pub status: String,
     pub signers: Vec<String>,
@@ -52,7 +52,7 @@ pub struct SubmitSignatureRequest {
 
 #[derive(Serialize, Deserialize)]
 pub struct SubmitSignatureResponse {
-    pub request_id: String,
+    pub id: String,
     pub status: String,
     pub signatures_submitted: usize,
     pub threshold: i64,
@@ -62,7 +62,7 @@ pub struct SubmitSignatureResponse {
 
 #[derive(Debug, Serialize)]
 pub struct DecryptResponse {
-    pub request_id: String,
+    pub id: String,
     pub plaintext: Vec<u8>,
     pub status: String,
 }
@@ -121,7 +121,7 @@ pub struct ListDecryptRequestsResponse {
 
 #[derive(Serialize, Deserialize)]
 pub struct DecryptRequestItem {
-    pub request_id: String,
+    pub id: String,
     pub turbo_da_app_id: String,
     pub status: String,
     pub signatures_submitted: usize,

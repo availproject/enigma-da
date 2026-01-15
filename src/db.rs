@@ -192,7 +192,7 @@ pub async fn add_participant(
     turbo_da_app_id: &str,
     address: &str,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("INSERT OR IGNORE INTO mpc_participants (turbo_da_app_id, address) VALUES (?, ?)")
+    sqlx::query("INSERT INTO mpc_participants (turbo_da_app_id, address) VALUES (?, ?)")
         .bind(turbo_da_app_id)
         .bind(address)
         .execute(pool)
