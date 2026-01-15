@@ -369,6 +369,32 @@ pub struct DecryptionRequestListWithThreshold {
     pub threshold: i64,
 }
 
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct SignatureCheckResult {
+    pub threshold: i64,
+    pub signatures_count: i64,
+}
+
+pub async fn get_signature_status(
+    pool: &SqlitePool,
+    request_id: &str,
+) -> Result<Option<SignatureCheckResult>, sqlx::Error> {
+    let result = sqlx::query_as::<_, SignatureCheckResult>(
+        r#"
+        SELECT a.threshold,
+               json_array_length(dr.submitted_signatures) as signatures_count
+        FROM decryption_requests dr
+        JOIN apps a ON dr.turbo_da_app_id = a.turbo_da_app_id
+        WHERE dr.id = ?
+        "#,
+    )
+    .bind(request_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(result)
+}
+
 pub async fn list_decryption_requests(
     pool: &SqlitePool,
     turbo_da_app_id: &str,

@@ -212,9 +212,7 @@ pub async fn submit_signature(
             "Participant not authorized for this decryption request".into(),
         ));
     }
-    let ciphertext_hash = keccak256(&record.ciphertext);
-    let message = format!("{:?}{}", ciphertext_hash, record.turbo_da_app_id);
-    // Verify the signature against the request_id
+    let message = format!("{}:{}", request_id, record.turbo_da_app_id);
     match utils::verify_ecdsa_signature(&message, &request.signature, &request.participant_address)
     {
         Ok(true) => {
@@ -230,6 +228,9 @@ pub async fn submit_signature(
                 request_id = %request_id,
                 "Signature verification failed"
             );
+            return Err(AppError::InvalidInput(
+                "Invalid signature: verification failed".into(),
+            ));
         }
         Err(e) => {
             tracing::error!(
@@ -238,6 +239,10 @@ pub async fn submit_signature(
                 request_id = %request_id,
                 "Error verifying signature"
             );
+            return Err(AppError::InvalidInput(format!(
+                "Invalid signature: {}",
+                e
+            )));
         }
     }
 
@@ -264,56 +269,26 @@ pub async fn submit_signature(
         ));
     }
 
-    let updated_record = db::get_decryption_request(&pool, &request_id)
+    let status = db::get_signature_status(&pool, &request_id)
         .await
         .map_err(|e| {
             tracing::error!(
                 error = %e,
                 request_id = %request_id,
-                "Database error while fetching updated decryption request after signature submission"
+                "Database error while fetching signature status"
             );
-            AppError::Database(format!("Failed to fetch updated decryption request: {}", e))
+            AppError::Database(format!("Failed to fetch signature status: {}", e))
         })?
         .ok_or_else(|| {
             tracing::error!(
                 request_id = %request_id,
-                "Decryption request disappeared after signature submission - possible data corruption"
+                "Decryption request not found after signature submission"
             );
             AppError::RequestNotFound(request_id.clone())
         })?;
 
-    let submitted_signatures: Vec<serde_json::Value> =
-        serde_json::from_str(&updated_record.submitted_signatures).map_err(|e| {
-            tracing::error!(
-                error = %e,
-                request_id = %request_id,
-                raw_signatures = %updated_record.submitted_signatures,
-                "Failed to parse submitted signatures JSON"
-            );
-            AppError::Internal(format!("Failed to parse submitted signatures: {}", e))
-        })?;
-
-    let signatures_count = submitted_signatures.len();
-
-    let threshold = db::get_app_threshold(&pool, &updated_record.turbo_da_app_id)
-        .await
-        .map_err(|e| {
-            tracing::error!(
-                error = %e,
-                request_id = %request_id,
-                app_id = %updated_record.turbo_da_app_id,
-                "Database error while fetching app threshold for signature verification"
-            );
-            AppError::Database(format!("Failed to get app threshold: {}", e))
-        })?
-        .ok_or_else(|| {
-            tracing::error!(
-                request_id = %request_id,
-                app_id = %updated_record.turbo_da_app_id,
-                "App not found when fetching threshold - possible data corruption"
-            );
-            AppError::Internal("App not found".into())
-        })?;
+    let signatures_count = status.signatures_count as usize;
+    let threshold = status.threshold;
 
     let ready_to_decrypt = signatures_count >= threshold as usize;
 
@@ -332,11 +307,29 @@ pub async fn submit_signature(
             "Threshold met, performing decryption"
         );
 
-        let turbo_da_app_id = Uuid::parse_str(&updated_record.turbo_da_app_id).map_err(|e| {
+        let record = db::get_decryption_request(&pool, &request_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(
+                    error = %e,
+                    request_id = %request_id,
+                    "Database error while fetching decryption request for decryption"
+                );
+                AppError::Database(format!("Failed to fetch decryption request: {}", e))
+            })?
+            .ok_or_else(|| {
+                tracing::error!(
+                    request_id = %request_id,
+                    "Decryption request not found"
+                );
+                AppError::RequestNotFound(request_id.clone())
+            })?;
+
+        let turbo_da_app_id = Uuid::parse_str(&record.turbo_da_app_id).map_err(|e| {
             tracing::error!(
                 error = %e,
                 request_id = %request_id,
-                app_id_str = %updated_record.turbo_da_app_id,
+                app_id_str = %record.turbo_da_app_id,
                 "Failed to parse turbo_da_app_id as UUID"
             );
             AppError::Internal(format!("Invalid UUID format: {}", e))
@@ -345,28 +338,23 @@ pub async fn submit_signature(
         tracing::debug!(
             request_id = %request_id,
             app_id = %turbo_da_app_id,
-            ciphertext_len = updated_record.ciphertext.len(),
+            ciphertext_len = record.ciphertext.len(),
             "Starting decryption process"
         );
 
-        let plaintext = utils::decrypt(turbo_da_app_id, &updated_record.ciphertext)
+        let plaintext = utils::decrypt(turbo_da_app_id, &record.ciphertext)
             .await
             .map_err(|e| {
                 tracing::error!(
                     error = %e,
                     request_id = %request_id,
                     app_id = %turbo_da_app_id,
-                    ciphertext_len = updated_record.ciphertext.len(),
+                    ciphertext_len = record.ciphertext.len(),
                     "Decryption operation failed"
                 );
                 AppError::DecryptionError(format!("Decryption failed: {}", e))
             })?;
 
-        tracing::debug!(
-            request_id = %request_id,
-            plaintext_len = plaintext.len(),
-            "Decryption successful, updating database"
-        );
 
         db::complete_decryption_request(&pool, &request_id, &plaintext)
             .await

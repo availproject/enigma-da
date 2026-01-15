@@ -42,7 +42,6 @@ use crate::types::{
     SubmitSignatureResponse,
 };
 use alloy::signers::{local::LocalSigner, Signer};
-use alloy_primitives::keccak256;
 use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
@@ -71,9 +70,9 @@ fn get_address_from_private_key(private_key_hex: &str) -> String {
 }
 
 /// Helper function to create a valid ECDSA signature for testing
-/// Signs the message format: keccak256(ciphertext) + app_id
+/// Signs the message format: request_id:turbo_da_app_id (matching decrypt.rs:215)
 async fn create_test_signature(
-    ciphertext: &[u8],
+    request_id: &str,
     turbo_da_app_id: &str,
     private_key_hex: &str,
 ) -> String {
@@ -83,9 +82,8 @@ async fn create_test_signature(
             .expect("Invalid private key");
     let signer = LocalSigner::from_signing_key(signing_key);
 
-    // Compute message exactly as in decrypt.rs:219-220
-    let ciphertext_hash = keccak256(ciphertext);
-    let message = format!("{:?}{}", ciphertext_hash, turbo_da_app_id);
+    // Compute message exactly as in decrypt.rs:215
+    let message = format!("{}:{}", request_id, turbo_da_app_id);
 
     // Sign the message
     let signature = signer
@@ -295,7 +293,7 @@ async fn test_submit_signature_request_not_found() {
 
     // Generate valid signature (even though request doesn't exist)
     let signature = create_test_signature(
-        &ciphertext,
+        &request_id,
         &turbo_da_app_id.to_string(),
         TEST_PRIVATE_KEY_1,
     )
@@ -344,7 +342,7 @@ async fn test_submit_signature_non_pending_request() {
 
     // Generate valid signature (even though request is already completed)
     let signature = create_test_signature(
-        &ciphertext,
+        &request_id,
         &turbo_da_app_id.to_string(),
         TEST_PRIVATE_KEY_1,
     )
@@ -389,7 +387,7 @@ async fn test_submit_signature_unauthorized_participant() {
 
     // Generate valid signature from unauthorized participant (TEST_ADDRESS_2)
     let signature = create_test_signature(
-        &ciphertext,
+        &request_id,
         &turbo_da_app_id.to_string(),
         TEST_PRIVATE_KEY_2,
     )
@@ -435,7 +433,7 @@ async fn test_submit_signature_duplicate_submission() {
 
     // Generate valid signature
     let signature = create_test_signature(
-        &ciphertext,
+        &request_id,
         &turbo_da_app_id.to_string(),
         TEST_PRIVATE_KEY_1,
     )
@@ -489,7 +487,7 @@ async fn test_submit_signature_success_below_threshold() {
 
     // Generate valid signature
     let signature = create_test_signature(
-        &ciphertext,
+        &request_id,
         &turbo_da_app_id.to_string(),
         TEST_PRIVATE_KEY_1,
     )
@@ -658,13 +656,13 @@ async fn test_integration_multiple_signatures_below_threshold() {
 
     // Generate valid signatures
     let signature1 = create_test_signature(
-        &ciphertext,
+        &request_id,
         &turbo_da_app_id.to_string(),
         TEST_PRIVATE_KEY_1,
     )
     .await;
     let signature2 = create_test_signature(
-        &ciphertext,
+        &request_id,
         &turbo_da_app_id.to_string(),
         TEST_PRIVATE_KEY_2,
     )
@@ -828,7 +826,7 @@ async fn test_integration_signature_verification_workflow() {
 
     // Generate valid signature
     let signature = create_test_signature(
-        &ciphertext,
+        &request_id,
         &turbo_da_app_id.to_string(),
         TEST_PRIVATE_KEY_1,
     )
@@ -970,7 +968,7 @@ async fn test_integration_successful_decryption_with_attestation() {
 
     // Step 3: Submit first signature (from TEST_ADDRESS_1)
     let signature1 = create_test_signature(
-        &ciphertext,
+        &request_id,
         &turbo_da_app_id.to_string(),
         TEST_PRIVATE_KEY_1,
     )
@@ -1015,7 +1013,7 @@ async fn test_integration_successful_decryption_with_attestation() {
 
     // Step 4: Submit second signature (from TEST_ADDRESS_2) - THIS MEETS THE THRESHOLD
     let signature2 = create_test_signature(
-        &ciphertext,
+        &request_id,
         &turbo_da_app_id.to_string(),
         TEST_PRIVATE_KEY_2,
     )
