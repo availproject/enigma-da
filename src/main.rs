@@ -166,7 +166,6 @@ async fn main() -> anyhow::Result<()> {
         let rustls_config = RustlsConfig::from_config(std::sync::Arc::new(rustls_server_config));
 
         tracing::info!(address = %addr, "Starting HTTPS server with mTLS");
-
         axum_server::bind_rustls(socket_addr, rustls_config)
             .handle(handle)
             .serve(app.into_make_service())

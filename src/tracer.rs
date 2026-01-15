@@ -20,8 +20,16 @@ impl Default for TracingConfig {
 }
 
 pub fn init_tracer(config: TracingConfig) {
-    let env_filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.log_level));
+    let (env_filter, effective_log_level) = match std::env::var("RUST_LOG") {
+        Ok(val) => {
+            eprintln!("Using RUST_LOG from environment: {}", val);
+            (EnvFilter::new(&val), val)
+        }
+        Err(_) => {
+            eprintln!("RUST_LOG not set, using default: {}", config.log_level);
+            (EnvFilter::new(&config.log_level), config.log_level.clone())
+        }
+    };
 
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_span_events(FmtSpan::CLOSE)
@@ -41,7 +49,7 @@ pub fn init_tracer(config: TracingConfig) {
     registry.init();
 
     tracing::info!(
-        log_level = %config.log_level,
+        log_level = %effective_log_level,
         enable_json = %config.enable_json,
         enable_metrics = %config.enable_metrics,
         "Tracing initialized"
