@@ -119,6 +119,7 @@ async fn test_create_decrypt_request_empty_ciphertext() {
 
     let request = DecryptRequest {
         turbo_da_app_id,
+        submission_id: Uuid::new_v4(),
         ciphertext: vec![], // Empty ciphertext
     };
 
@@ -137,6 +138,7 @@ async fn test_create_decrypt_request_app_not_registered() {
 
     let request = DecryptRequest {
         turbo_da_app_id,
+        submission_id: Uuid::new_v4(),
         ciphertext: vec![1, 2, 3, 4],
     };
 
@@ -160,6 +162,7 @@ async fn test_create_decrypt_request_no_participants() {
 
     let request = DecryptRequest {
         turbo_da_app_id,
+        submission_id: Uuid::new_v4(),
         ciphertext: vec![1, 2, 3, 4],
     };
 
@@ -192,6 +195,7 @@ async fn test_create_decrypt_request_success() {
     let ciphertext = vec![1, 2, 3, 4, 5, 6, 7, 8];
     let request = DecryptRequest {
         turbo_da_app_id,
+        submission_id: Uuid::new_v4(),
         ciphertext: ciphertext.clone(),
     };
 
@@ -221,12 +225,12 @@ async fn test_create_decrypt_request_success() {
 #[tokio::test]
 async fn test_get_decrypt_request_not_found() {
     let pool = setup_test_db().await;
-    let request_id = Uuid::new_v4().to_string();
+    let request_id = Uuid::new_v4();
 
-    let result = get_decrypt_request(State(pool), Path(request_id.clone())).await;
+    let result = get_decrypt_request(State(pool), Path(request_id)).await;
 
     match result {
-        Err(AppError::RequestNotFound(id)) => assert_eq!(id, request_id),
+        Err(AppError::RequestNotFound(id)) => assert_eq!(id, request_id.to_string()),
         _ => panic!("Expected RequestNotFound error"),
     }
 }
@@ -235,7 +239,7 @@ async fn test_get_decrypt_request_not_found() {
 async fn test_get_decrypt_request_success() {
     let pool = setup_test_db().await;
     let turbo_da_app_id = Uuid::new_v4();
-    let request_id = Uuid::new_v4().to_string();
+    let request_id = Uuid::new_v4();
     let ciphertext = vec![1, 2, 3, 4, 5];
 
     // Setup
@@ -249,14 +253,14 @@ async fn test_get_decrypt_request_success() {
     // Create decryption request
     db::create_decryption_request(
         &pool,
-        &request_id,
+        &request_id.to_string(),
         &turbo_da_app_id.to_string(),
         &ciphertext,
     )
     .await
     .expect("Failed to create decryption request");
 
-    let result = get_decrypt_request(State(pool), Path(request_id.clone())).await;
+    let result = get_decrypt_request(State(pool), Path(request_id)).await;
 
     assert!(result.is_ok());
     let response = result.unwrap();
@@ -264,7 +268,7 @@ async fn test_get_decrypt_request_success() {
     let response: DecryptRequestResponse =
         serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
 
-    assert_eq!(response.request_id, request_id);
+    assert_eq!(response.request_id, request_id.to_string());
     assert_eq!(response.turbo_da_app_id, turbo_da_app_id.to_string());
     assert_eq!(response.status, "pending");
     assert_eq!(response.signers.len(), 1);
@@ -587,8 +591,10 @@ async fn test_integration_create_and_retrieve_decrypt_request() {
 
     // Create decryption request
     let ciphertext = vec![10, 20, 30, 40, 50];
+    let submission_id = Uuid::new_v4();
     let create_request = DecryptRequest {
         turbo_da_app_id,
+        submission_id,
         ciphertext: ciphertext.clone(),
     };
 
@@ -603,7 +609,7 @@ async fn test_integration_create_and_retrieve_decrypt_request() {
     let request_id = create_response.request_id.clone();
 
     // Retrieve the request
-    let get_result = get_decrypt_request(State(pool.clone()), Path(request_id.clone())).await;
+    let get_result = get_decrypt_request(State(pool.clone()), Path(submission_id)).await;
     assert!(get_result.is_ok());
 
     let get_response = get_result.unwrap();
@@ -640,6 +646,7 @@ async fn test_integration_multiple_signatures_below_threshold() {
     // Create request
     let create_request = DecryptRequest {
         turbo_da_app_id,
+        submission_id: Uuid::new_v4(),
         ciphertext: ciphertext.clone(),
     };
 
@@ -756,11 +763,13 @@ async fn test_integration_concurrent_requests() {
     // Create requests for both apps
     let request1 = DecryptRequest {
         turbo_da_app_id: app_id1,
+        submission_id: Uuid::new_v4(),
         ciphertext: vec![1, 2, 3],
     };
 
     let request2 = DecryptRequest {
         turbo_da_app_id: app_id2,
+        submission_id: Uuid::new_v4(),
         ciphertext: vec![4, 5, 6],
     };
 
@@ -804,8 +813,10 @@ async fn test_integration_signature_verification_workflow() {
         .expect("Failed to add participant");
 
     // Create request
+    let submission_id = Uuid::new_v4();
     let create_request = DecryptRequest {
         turbo_da_app_id,
+        submission_id,
         ciphertext: ciphertext.clone(),
     };
 
@@ -855,7 +866,7 @@ async fn test_integration_signature_verification_workflow() {
     assert!(!sig_response.ready_to_decrypt);
 
     // Retrieve the request to see updated state
-    let get_result = get_decrypt_request(State(pool.clone()), Path(request_id.clone())).await;
+    let get_result = get_decrypt_request(State(pool.clone()), Path(submission_id)).await;
     assert!(get_result.is_ok());
 
     let get_response = get_result.unwrap();
@@ -947,6 +958,7 @@ async fn test_integration_successful_decryption_with_attestation() {
 
     let create_request = DecryptRequest {
         turbo_da_app_id,
+        submission_id: Uuid::new_v4(),
         ciphertext: ciphertext.clone(),
     };
 
@@ -1128,6 +1140,7 @@ async fn test_edge_case_threshold_of_zero() {
 
     let request = DecryptRequest {
         turbo_da_app_id,
+        submission_id: Uuid::new_v4(),
         ciphertext: vec![1, 2, 3],
     };
 
@@ -1155,6 +1168,7 @@ async fn test_edge_case_large_ciphertext() {
 
     let request = DecryptRequest {
         turbo_da_app_id,
+        submission_id: Uuid::new_v4(),
         ciphertext: large_ciphertext.clone(),
     };
 

@@ -78,11 +78,10 @@ pub async fn create_decrypt_request(
         ));
     }
 
-    let request_id = Uuid::new_v4().to_string();
 
     db::create_decryption_request(
         &pool,
-        &request_id,
+        &request.submission_id.to_string().as_str(),
         &turbo_da_app_id_str,
         &request.ciphertext,
     )
@@ -90,7 +89,7 @@ pub async fn create_decrypt_request(
     .map_err(|e| {
         tracing::error!(
             error = %e,
-            request_id = %request_id,
+            request_id = %request.submission_id,
             app_id = %turbo_da_app_id_str,
             "Database error while creating decryption request"
         );
@@ -98,7 +97,7 @@ pub async fn create_decrypt_request(
     })?;
 
     tracing::info!(
-        request_id = %request_id,
+        request_id = %request.submission_id,
         app_id = %turbo_da_app_id_str,
         signer_count = signers.len(),
         threshold = threshold,
@@ -106,7 +105,7 @@ pub async fn create_decrypt_request(
     );
 
     Ok(Json(DecryptRequestResponse {
-        request_id,
+        request_id: request.submission_id.to_string(),
         turbo_da_app_id: turbo_da_app_id_str,
         status: "pending".to_string(),
         signers,
@@ -116,11 +115,11 @@ pub async fn create_decrypt_request(
 
 pub async fn get_decrypt_request(
     State(pool): State<SqlitePool>,
-    Path(request_id): Path<String>,
+    Path(request_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, AppError> {
     tracing::info!(request_id = %request_id, "Fetching decryption request status");
 
-    let record = db::get_decryption_request(&pool, &request_id)
+    let record = db::get_decryption_request(&pool, &request_id.to_string())
         .await
         .map_err(|e| {
             tracing::error!(
@@ -135,7 +134,7 @@ pub async fn get_decrypt_request(
                 request_id = %request_id,
                 "Decryption request not found in database"
             );
-            AppError::RequestNotFound(request_id.clone())
+            AppError::RequestNotFound(request_id.to_string())
         })?;
 
     let signers = db::get_participants(&pool, &record.turbo_da_app_id)

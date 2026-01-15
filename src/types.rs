@@ -29,13 +29,8 @@ pub struct QuoteResponse {
 #[derive(Debug, Deserialize, Clone)]
 pub struct DecryptRequest {
     pub turbo_da_app_id: Uuid,
+    pub submission_id:Uuid,
     pub ciphertext: Vec<u8>,
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DecryptRequestData {
-    pub app_id: String,
-    pub ciphertext_array: Vec<u8>,
-    pub decrypted_array: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
