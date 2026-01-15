@@ -132,7 +132,7 @@ async fn test_create_decrypt_request_empty_ciphertext() {
 
     let request = DecryptRequest {
         turbo_da_app_id,
-        submission_id: Uuid::new_v4(),
+        id: Uuid::new_v4(),
         ciphertext: vec![], // Empty ciphertext
     };
 
@@ -151,7 +151,7 @@ async fn test_create_decrypt_request_app_not_registered() {
 
     let request = DecryptRequest {
         turbo_da_app_id,
-        submission_id: Uuid::new_v4(),
+        id: Uuid::new_v4(),
         ciphertext: vec![1, 2, 3, 4],
     };
 
@@ -175,7 +175,7 @@ async fn test_create_decrypt_request_no_participants() {
 
     let request = DecryptRequest {
         turbo_da_app_id,
-        submission_id: Uuid::new_v4(),
+        id: Uuid::new_v4(),
         ciphertext: vec![1, 2, 3, 4],
     };
 
@@ -208,7 +208,7 @@ async fn test_create_decrypt_request_success() {
     let ciphertext = vec![1, 2, 3, 4, 5, 6, 7, 8];
     let request = DecryptRequest {
         turbo_da_app_id,
-        submission_id: Uuid::new_v4(),
+        id: Uuid::new_v4(),
         ciphertext: ciphertext.clone(),
     };
 
@@ -223,10 +223,10 @@ async fn test_create_decrypt_request_success() {
     assert_eq!(response.turbo_da_app_id, turbo_da_app_id.to_string());
     assert_eq!(response.status, "pending");
     assert_eq!(response.signers.len(), 2);
-    assert!(!response.request_id.is_empty());
+    assert!(!response.id.is_empty());
 
     // Verify the request was stored in database
-    let stored_request = db::get_decryption_request(&pool, &response.request_id)
+    let stored_request = db::get_decryption_request(&pool, &response.id)
         .await
         .expect("Failed to fetch request")
         .expect("Request not found");
@@ -514,7 +514,7 @@ async fn test_submit_signature_success_below_threshold() {
     let response: SubmitSignatureResponse =
         serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
 
-    assert_eq!(response.request_id, request_id);
+    assert_eq!(response.id, request_id);
     assert_eq!(response.status, "pending");
     assert_eq!(response.signatures_submitted, 1);
     assert_eq!(response.threshold, 2);
@@ -588,10 +588,10 @@ async fn test_integration_create_and_retrieve_decrypt_request() {
 
     // Create decryption request
     let ciphertext = vec![10, 20, 30, 40, 50];
-    let submission_id = Uuid::new_v4();
+    let id = Uuid::new_v4();
     let create_request = DecryptRequest {
         turbo_da_app_id,
-        submission_id,
+        id,
         ciphertext: ciphertext.clone(),
     };
 
@@ -603,10 +603,10 @@ async fn test_integration_create_and_retrieve_decrypt_request() {
     let create_response: DecryptRequestResponse =
         serde_json::from_slice(&create_response_body.collect().await.unwrap().to_bytes()).unwrap();
 
-    let request_id = create_response.request_id.clone();
+    let request_id = create_response.id.clone();
 
     // Retrieve the request
-    let get_result = get_decrypt_request(State(pool.clone()), Path(submission_id)).await;
+    let get_result = get_decrypt_request(State(pool.clone()), Path(id)).await;
     assert!(get_result.is_ok());
 
     let get_response = get_result.unwrap();
@@ -642,7 +642,7 @@ async fn test_integration_multiple_signatures_below_threshold() {
     // Create request
     let create_request = DecryptRequest {
         turbo_da_app_id,
-        submission_id: Uuid::new_v4(),
+        id: Uuid::new_v4(),
         ciphertext: ciphertext.clone(),
     };
 
@@ -654,7 +654,7 @@ async fn test_integration_multiple_signatures_below_threshold() {
     let create_response: DecryptRequestResponse =
         serde_json::from_slice(&create_response_body.collect().await.unwrap().to_bytes()).unwrap();
 
-    let request_id = create_response.request_id.clone();
+    let request_id = create_response.id.clone();
 
     // Generate valid signatures
     let signature1 = create_test_signature(
@@ -759,13 +759,13 @@ async fn test_integration_concurrent_requests() {
     // Create requests for both apps
     let request1 = DecryptRequest {
         turbo_da_app_id: app_id1,
-        submission_id: Uuid::new_v4(),
+        id: Uuid::new_v4(),
         ciphertext: vec![1, 2, 3],
     };
 
     let request2 = DecryptRequest {
         turbo_da_app_id: app_id2,
-        submission_id: Uuid::new_v4(),
+        id: Uuid::new_v4(),
         ciphertext: vec![4, 5, 6],
     };
 
@@ -786,7 +786,7 @@ async fn test_integration_concurrent_requests() {
         serde_json::from_slice(&response2_body.collect().await.unwrap().to_bytes()).unwrap();
 
     // Verify both requests are independent
-    assert_ne!(response1.request_id, response2.request_id);
+    assert_ne!(response1.id, response2.id);
     assert_eq!(response1.turbo_da_app_id, app_id1.to_string());
     assert_eq!(response2.turbo_da_app_id, app_id2.to_string());
 }
@@ -812,7 +812,7 @@ async fn test_integration_signature_verification_workflow() {
     let submission_id = Uuid::new_v4();
     let create_request = DecryptRequest {
         turbo_da_app_id,
-        submission_id,
+        id: submission_id,
         ciphertext: ciphertext.clone(),
     };
 
@@ -824,7 +824,7 @@ async fn test_integration_signature_verification_workflow() {
     let create_response: DecryptRequestResponse =
         serde_json::from_slice(&create_response_body.collect().await.unwrap().to_bytes()).unwrap();
 
-    let request_id = create_response.request_id.clone();
+    let request_id = create_response.id.clone();
 
     // Generate valid signature
     let signature = create_test_signature(
@@ -954,7 +954,7 @@ async fn test_integration_successful_decryption_with_attestation() {
 
     let create_request = DecryptRequest {
         turbo_da_app_id,
-        submission_id: Uuid::new_v4(),
+        id: Uuid::new_v4(),
         ciphertext: ciphertext.clone(),
     };
 
@@ -966,7 +966,7 @@ async fn test_integration_successful_decryption_with_attestation() {
     let create_response: DecryptRequestResponse =
         serde_json::from_slice(&create_response_body.collect().await.unwrap().to_bytes()).unwrap();
 
-    let request_id = create_response.request_id.clone();
+    let request_id = create_response.id.clone();
 
     // Step 3: Submit first signature (from TEST_ADDRESS_1)
     let signature1 = create_test_signature(
@@ -1136,7 +1136,7 @@ async fn test_edge_case_threshold_of_zero() {
 
     let request = DecryptRequest {
         turbo_da_app_id,
-        submission_id: Uuid::new_v4(),
+        id: Uuid::new_v4(),
         ciphertext: vec![1, 2, 3],
     };
 
@@ -1164,7 +1164,7 @@ async fn test_edge_case_large_ciphertext() {
 
     let request = DecryptRequest {
         turbo_da_app_id,
-        submission_id: Uuid::new_v4(),
+        id: Uuid::new_v4(),
         ciphertext: large_ciphertext.clone(),
     };
 
@@ -1177,7 +1177,7 @@ async fn test_edge_case_large_ciphertext() {
         serde_json::from_slice(&response_body.collect().await.unwrap().to_bytes()).unwrap();
 
     // Verify large ciphertext was stored
-    let _stored_request = db::get_decryption_request(&pool, &response.request_id)
+    let _stored_request = db::get_decryption_request(&pool, &response.id)
         .await
         .expect("Failed to fetch request")
         .expect("Request not found");
