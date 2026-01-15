@@ -375,6 +375,40 @@ pub struct SignatureCheckResult {
     pub signatures_count: i64,
 }
 
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct SignatureSubmissionCheck {
+    pub status: String,
+    pub turbo_da_app_id: String,
+    pub is_participant_authorized: bool,
+}
+
+pub async fn check_signature_submission(
+    pool: &SqlitePool,
+    request_id: &str,
+    participant_address: &str,
+) -> Result<Option<SignatureSubmissionCheck>, sqlx::Error> {
+    let result = sqlx::query_as::<_, SignatureSubmissionCheck>(
+        r#"
+        SELECT
+            dr.status,
+            dr.turbo_da_app_id,
+            EXISTS(
+                SELECT 1 FROM mpc_participants mp
+                WHERE mp.turbo_da_app_id = dr.turbo_da_app_id
+                AND mp.address = ?
+            ) as is_participant_authorized
+        FROM decryption_requests dr
+        WHERE dr.id = ?
+        "#,
+    )
+    .bind(participant_address)
+    .bind(request_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(result)
+}
+
 pub async fn get_signature_status(
     pool: &SqlitePool,
     request_id: &str,

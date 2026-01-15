@@ -157,16 +157,16 @@ pub async fn submit_signature(
         "Submitting signature for decryption request"
     );
 
-    let record = db::get_decryption_request(&pool, &request_id)
+    let check = db::check_signature_submission(&pool, &request_id, &request.participant_address)
         .await
         .map_err(|e| {
             tracing::error!(
                 error = %e,
                 request_id = %request_id,
                 participant = %request.participant_address,
-                "Database error while fetching decryption request for signature submission"
+                "Database error while checking signature submission eligibility"
             );
-            AppError::Database(format!("Failed to fetch decryption request: {}", e))
+            AppError::Database(format!("Failed to check signature submission: {}", e))
         })?
         .ok_or_else(|| {
             tracing::debug!(
@@ -177,32 +177,20 @@ pub async fn submit_signature(
             AppError::RequestNotFound(request_id.clone())
         })?;
 
-    if record.status != "pending" {
+    if check.status != "pending" {
         tracing::debug!(
             request_id = %request_id,
             participant = %request.participant_address,
-            current_status = %record.status,
+            current_status = %check.status,
             "Cannot submit signature: request not in pending state"
         );
         return Err(AppError::InvalidInput(format!(
             "Decryption request is in '{}' state, cannot accept signatures",
-            record.status
+            check.status
         )));
     }
 
-    let signers = db::get_participants(&pool, &record.turbo_da_app_id)
-        .await
-        .map_err(|e| {
-            tracing::error!(
-                error = %e,
-                request_id = %request_id,
-                app_id = %record.turbo_da_app_id,
-                "Database error while fetching participants for signature verification"
-            );
-            AppError::Database(format!("Failed to get participants: {}", e))
-        })?;
-
-    if !signers.contains(&request.participant_address) {
+    if !check.is_participant_authorized {
         tracing::warn!(
             request_id = %request_id,
             participant = %request.participant_address,
@@ -212,7 +200,8 @@ pub async fn submit_signature(
             "Participant not authorized for this decryption request".into(),
         ));
     }
-    let message = format!("{}:{}", request_id, record.turbo_da_app_id);
+
+    let message = format!("{}:{}", request_id, check.turbo_da_app_id);
     match utils::verify_ecdsa_signature(&message, &request.signature, &request.participant_address)
     {
         Ok(true) => {
